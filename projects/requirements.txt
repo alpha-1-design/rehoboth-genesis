@@ -1,0 +1,11 @@
+FastAPI
+uvicorn
+pydantic
+FastAPI
+uvicorn
+python-dotenv
+Pydantic
+FastAPI
+uvicorn
+pydantic
+typing
