@@ -6,118 +6,103 @@
     <title>GENESIS COMMAND</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Force vertical layout and hide horizontal overflow */
-        html, body { 
-            overflow-x: hidden; 
-            width: 100%;
-            position: relative;
-        }
-        body { background: #010409; color: #c9d1d9; font-family: ui-monospace, monospace; }
-        
-        /* Ensure cards never exceed screen width */
-        .card { 
-            background: #0d1117; 
-            border: 1px solid #30363d; 
-            border-radius: 8px; 
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-
-        /* Fixed terminal at the bottom that stays on top */
-        .terminal-container { 
-            background: #000; 
-            border-top: 2px solid #238636; 
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            width: 100%; 
-            padding: 12px; 
-            z-index: 9999;
-        }
-
-        /* Custom scrollbar for code blocks so they don't break the layout */
-        pre {
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
+        body { background: #010409; color: #c9d1d9; font-family: ui-monospace, monospace; overflow-x: hidden; }
+        .card { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; width: 100%; }
+        .terminal-container { background: #000; border-top: 2px solid #238636; position: fixed; bottom: 0; left: 0; width: 100%; padding: 12px; z-index: 100; }
+        #console-box { background: rgba(0,0,0,0.9); border: 1px solid #1e3a8a; border-radius: 4px; }
+        pre { white-space: pre-wrap; word-wrap: break-word; font-size: 10px; }
         input { background: transparent; border: none; outline: none; color: #3fb950; font-size: 16px; width: 100%; }
+        .btn { font-weight: bold; padding: 6px 10px; border-radius: 4px; text-transform: uppercase; font-size: 9px; transition: opacity 0.2s; }
     </style>
 </head>
-<body class="pb-32 px-4 pt-4">
-    <header class="flex justify-between items-center mb-6 w-full">
+<body class="pb-64 px-4 pt-4">
+    <header class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-lg font-black text-white">REHOBOTH <span class="text-blue-500">GENESIS</span></h1>
-            <p class="text-[9px] text-gray-500 uppercase tracking-widest leading-none">Autonomous Nexus</p>
+            <h1 class="text-lg font-black text-white italic">REHOBOTH <span class="text-blue-500">GENESIS</span></h1>
+            <p class="text-[9px] text-gray-500 uppercase tracking-widest">Autonomous Nexus v1.0</p>
         </div>
         <div class="text-[10px] text-right">
             <span class="text-green-500 font-bold">● SYSTEM LIVE</span><br>
-            <span class="text-gray-500 uppercase">DISK: {{ stats.DISK }}</span>
+            <button onclick="purgeSystem()" class="text-red-500 hover:text-red-400 font-bold">
+                [PURGE] DISK: {{ stats.DISK }}
+            </button>
         </div>
     </header>
 
-    <div class="w-full space-y-4">
+    <div class="space-y-4">
         {% for item in artifacts %}
         <div class="card p-4">
             <div class="flex justify-between items-center mb-3">
                 <span class="text-blue-400 font-bold text-xs truncate mr-2">{{ item.name }}</span>
-                <button onclick="deploy('{{ item.name }}')" 
-                        class="bg-[#238636] text-white text-[9px] font-bold px-3 py-1.5 rounded uppercase flex-shrink-0">
-                    Deploy
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="runModule('{{ item.name }}')" class="btn bg-blue-600 text-white">Run</button>
+                    <button onclick="deploy('{{ item.name }}')" class="btn bg-[#238636] text-white">Vault</button>
+                </div>
             </div>
-            <div class="bg-black p-3 rounded text-[10px] text-gray-400 border border-gray-800">
-                <pre><code class="break-all">{{ item.code }}...</code></pre>
+            <div class="bg-black p-3 rounded text-gray-400 border border-gray-800">
+                <pre><code>{{ item.code }}...</code></pre>
             </div>
         </div>
         {% endfor %}
     </div>
 
+    <div id="console-box" class="fixed bottom-20 left-4 right-4 p-2 h-32 overflow-hidden shadow-2xl z-50">
+        <div class="text-[8px] text-blue-500 font-bold mb-1 tracking-tighter uppercase">Live System Pulse</div>
+        <pre id="log-content" class="text-[9px] text-green-400 opacity-80 leading-tight">Waiting for heartbeat...</pre>
+    </div>
+
     <div class="terminal-container">
         <div class="flex items-center gap-2">
             <span class="text-green-500 font-bold text-sm">CMD:></span>
-            <input type="text" id="cmdInput" placeholder="Command Orchestrator..." autocomplete="off" onkeypress="handleEnter(event)">
+            <input type="text" id="cmdInput" placeholder="Order Directive..." autocomplete="off" onkeypress="handleEnter(event)">
         </div>
-        <div id="feedback" class="text-[9px] mt-1 text-gray-500 italic">Ready for instruction.</div>
+        <div id="feedback" class="text-[10px] mt-1 text-gray-500 italic">Awaiting instructions.</div>
     </div>
 
     <script>
+        function updateLogs() {
+            fetch('/logs').then(res => res.text()).then(data => {
+                document.getElementById('log-content').innerText = data;
+            });
+        }
+        setInterval(updateLogs, 3000);
+
+        function purgeSystem() {
+            if(confirm("DANGER: This will wipe non-essential evolutions and logs. Continue?")) {
+                fetch('/purge').then(res => res.json()).then(data => {
+                    alert(data.message);
+                    location.reload();
+                });
+            }
+        }
+
         function handleEnter(e) {
             if (e.key === 'Enter') {
                 const input = document.getElementById('cmdInput');
                 const feedback = document.getElementById('feedback');
-                const val = input.value.trim();
-                
-                if(!val) return;
-
-                feedback.innerText = "Transmitting to Core...";
-                
+                feedback.innerText = "Generating Evolution...";
                 fetch('/execute', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({instruction: val})
-                })
-                .then(res => res.json())
-                .then(data => {
+                    body: JSON.stringify({instruction: input.value})
+                }).then(res => res.json()).then(data => {
                     feedback.innerText = data.feedback;
                     input.value = '';
-                    setTimeout(() => location.reload(), 2000);
-                })
-                .catch(err => feedback.innerText = "Link Failure.");
+                    setTimeout(() => location.reload(), 1500);
+                });
             }
         }
 
+        function runModule(filename) {
+            fetch('/run/' + filename).then(res => res.json()).then(data => {
+                alert(data.message);
+            });
+        }
+
         function deploy(filename) {
-            const feedback = document.getElementById('feedback');
-            feedback.innerText = "Deploying " + filename + "...";
-            fetch('/deploy/' + filename)
-                .then(res => res.json())
-                .then(data => {
-                    alert(data.message);
-                    feedback.innerText = "Vault Update Complete.";
-                });
+            fetch('/deploy/' + filename).then(res => res.json()).then(data => {
+                alert(data.message);
+            });
         }
     </script>
 </body>
