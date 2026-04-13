@@ -138,6 +138,25 @@ def api_vitals():
     return jsonify(get_vitals())
 
 
+@app.route("/api/automation/status")
+def api_automation_status():
+    if not NEXUS_API_AVAILABLE:
+        return jsonify({"error": "Nexus API not available"})
+    api = get_api()
+    return jsonify(api.get_automation_status())
+
+
+@app.route("/api/automation/execute", methods=["POST"])
+def api_automation_execute():
+    if not NEXUS_API_AVAILABLE:
+        return jsonify({"error": "Nexus API not available"})
+    api = get_api()
+    data = request.json or {}
+    tool = data.get("tool")
+    params = data.get("params", {})
+    return jsonify(api.run_automation_tool(tool, params))
+
+
 @app.route("/api/execute", methods=["POST"])
 async def api_execute():
     if not NEXUS_API_AVAILABLE:
