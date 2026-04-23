@@ -2039,60 +2039,24 @@ Available commands:
                 pass  # Reviewing is internal
             elif step.state == ThinkingState.COMPLETE:
                 self._show_complete(step)
-<<<<<<< HEAD
-                
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         elif event_type == "finish":
             if step.state == ThinkingState.ANALYZING:
                 self._hide_loading()
             elif step.state == ThinkingState.EXECUTING:
-<<<<<<< HEAD
-                self._show_tool_result(step)
-=======
                 self._render_tool_result(step)
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             elif step.state == ThinkingState.COMPLETE:
                 self._show_task_complete(step)
 
     def _show_loading(self, message: str) -> None:
-<<<<<<< HEAD
-        """Show loading indicator."""
-        if not self._first_token_received:
-            sys.stdout.write(f"\033[93m◌ {message}\033[0m")
-=======
         """Show dynamic loading indicator."""
         if not self._first_token_received:
             cyan = "\033[36m"
             reset = "\033[0m"
             sys.stdout.write(f"\r{cyan}◈{reset} {message}...")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             sys.stdout.flush()
 
     def _hide_loading(self) -> None:
         """Hide loading indicator."""
-<<<<<<< HEAD
-        sys.stdout.write("\r" + " " * 40 + "\r")
-        sys.stdout.flush()
-
-    def _show_tool_start(self, step) -> None:
-        """Show tool execution start."""
-        print(f"\n\033[94m--- [TOOL] {step.tool_name} ---\033[0m")
-        if step.tool_args:
-            args_str = ", ".join(f"{k}={repr(v)[:30]}" for k, v in list(step.tool_args.items())[:3])
-            print(f"  \033[90m{args_str}...\033[0m")
-
-    def _show_tool_result(self, step) -> None:
-        """Show tool execution result."""
-        if step.state == ThinkingState.ERROR:
-            print(f"\033[91m  ✗ Failed: {step.detail or 'Unknown error'}\033[0m")
-        else:
-            result_preview = (step.tool_result or "")[:150].replace("\n", " ")
-            print(f"\033[92m  ✓ Success\033[0m — {step.duration_ms:.0f}ms")
-            if result_preview:
-                print(f"  \033[90m{result_preview}...\033[0m")
-=======
         sys.stdout.write("\r" + " " * 60 + "\r")
         sys.stdout.flush()
 
@@ -2135,7 +2099,6 @@ Available commands:
                 else:
                     indented_content = content.replace("\n", f"\n{indent}")
                     print(f"{indent}{indented_content}")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
     def _show_complete(self, step) -> None:
         """Show step complete."""
