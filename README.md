@@ -40,11 +40,12 @@ Enter a command or type /help to begin the cycle.
 
 ## Quick Start
 
-### 1. Install Nexus
+### 1. Install Nexus (Global Deployment)
 ```bash
 git clone https://github.com/alpha-1-design/Nexus.git && cd Nexus
-pip install -e .
+bash install.sh
 ```
+This installer creates a self-contained environment and links the `nexus` command globally. You never need to activate a `venv` manually.
 
 ### 2. Launch Interactive Session
 

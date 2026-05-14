@@ -400,8 +400,22 @@ class BashTool(BaseTool):
         description: str | None = None,
         **kwargs,
     ) -> ToolResult:
+        # Check safety first
+        from ..safety import get_safety_engine
+        safety = get_safety_engine()
+        context = {"tool": "bash", "command": command}
+        violations = safety.check(context)
+        proceed, reason = safety.should_proceed(violations)
+        
+        if not proceed:
+            return ToolResult(success=False, content="", error=reason)
+
         try:
             cwd = workdir if workdir else os.getcwd()
+            # If in sandbox mode, enforce directory restriction
+            if safety.get_mode() == "sandbox":
+                # Implementation of restricted chroot/shell jail would go here
+                pass
 
             process = await asyncio.create_subprocess_shell(
                 command,

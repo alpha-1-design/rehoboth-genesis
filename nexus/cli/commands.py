@@ -2,15 +2,12 @@
 
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 import click
 
 from nexus import __version__
-from nexus.config import NexusConfig, ProviderConfig, load_config, save_config
-from nexus.providers import get_manager
-from nexus.providers.base import Message
-from nexus.tools import get_registry
 
 
 @click.group()
@@ -23,11 +20,27 @@ def cli(ctx: click.Context, config: str | None) -> None:
     A powerful, self-hosted AI coding agent that combines the best features
     of OpenClaw, Claude Code, Gemini CLI, OpenCode, and NemoClaw.
     """
+    from nexus.config import load_config
     ctx.ensure_object(dict)
     if config:
         ctx.obj["config"] = load_config(Path(config))
     else:
         ctx.obj["config"] = load_config()
+
+
+@cli.command("upgrade")
+def upgrade() -> None:
+    """Upgrade Nexus to the latest version."""
+    import subprocess
+    click.echo(f"\n{chr(0x2728)} Checking for updates...")
+    try:
+        # Fetch latest
+        subprocess.run(["git", "pull", "origin", "main"], check=True)
+        # Re-install
+        subprocess.run(["bash", "install.sh"], check=True)
+        click.echo(f"\n{chr(0x2705)} Nexus upgraded successfully.")
+    except Exception as e:
+        click.echo(f"\n{chr(0x274C)} Upgrade failed: {e}")
 
 
 # Provider commands
@@ -37,10 +50,12 @@ def provider():
     pass
 
 
+
 @provider.command("list")
 @click.pass_context
 def provider_list(ctx: click.Context) -> None:
     """List all configured providers."""
+    from nexus.providers import get_manager
     config: NexusConfig = ctx.obj["config"]
     get_manager()
 
@@ -73,6 +88,7 @@ def provider_add(
     model: str,
 ) -> None:
     """Add a new AI provider."""
+    from nexus.config import ProviderConfig, save_config
     config: NexusConfig = ctx.obj["config"]
 
     config.providers[name] = ProviderConfig(
@@ -92,6 +108,7 @@ def provider_add(
 @click.pass_context
 def provider_remove(ctx: click.Context, name: str) -> None:
     """Remove a provider."""
+    from nexus.config import save_config
     config: NexusConfig = ctx.obj["config"]
 
     if name in config.providers:
@@ -107,6 +124,8 @@ def provider_remove(ctx: click.Context, name: str) -> None:
 @click.pass_context
 def provider_set_active(ctx: click.Context, name: str) -> None:
     """Set the active provider."""
+    from nexus.config import save_config
+    from nexus.providers import get_manager
     config: NexusConfig = ctx.obj["config"]
 
     if name not in config.providers:
@@ -593,7 +612,7 @@ def setup_cmd(
 
     # Banner
     click.echo("\n" + "=" * 50)
-    click.echo("  ⚡ NEXUS SETUP WIZARD")
+    click.echo("  NEXUS SETUP WIZARD")
     click.echo("=" * 50)
     if is_termux:
         click.echo("  [Detected: Termux/Android]")
@@ -883,6 +902,8 @@ def doctor(ctx: click.Context) -> None:
         click.echo("\n[+] All checks passed!")
 
 
+from ..utils.dependencies import ensure_dependency
+
 # Dashboard command (optional — lazy loaded)
 @cli.command("dashboard")
 @click.option("--port", default=5000, help="Port to run on")
@@ -895,12 +916,10 @@ def dashboard(ctx: click.Context, port: int, host: str, open: bool) -> None:
     The dashboard provides a visual overview of sessions, stats, and provider status.
     Run 'nexus dashboard --help' for options.
     """
-    try:
-        from ..dashboard.app import create_app
-    except ImportError:
-        click.echo("Dashboard dependencies not installed.", err=True)
-        click.echo("Install with: pip install nexus[all] or pip install flask", err=True)
+    if not ensure_dependency("flask"):
         return
+
+    from ..dashboard.app import create_app
 
     app = create_app()
 
@@ -914,12 +933,17 @@ def dashboard(ctx: click.Context, port: int, host: str, open: bool) -> None:
     click.echo("Press Ctrl+C to stop")
     app.run(host=host, port=port, debug=False)
 
-
 # TUI command
 @cli.command()
 @click.pass_context
 def tui(ctx: click.Context) -> None:
     """Launch the rich Textual TUI."""
+    if not ensure_dependency("textual"):
+        return
+
+    from .welcome import display_welcome
+    display_welcome()
+
     from ..tui.app import NexusTUI
 
     app = NexusTUI()
@@ -960,7 +984,18 @@ def voice(
       TTS: freetts (default, no key), openai, espeak, pico
       STT: assemblyai, deepgram, whisper, freetts
     """
+    if not ensure_dependency("pyaudio"):
+        return
+
+    if stt_override == "whisper" or (not stt_override and "whisper" in str(ctx.obj.get("config", {}))):
+         if not ensure_dependency("faster-whisper"):
+             return
+
+    from .welcome import display_welcome
+    display_welcome()
+
     import asyncio
+
 
     from ..personality import get_personality
     from ..voice import get_voice_engine
@@ -1030,6 +1065,9 @@ def repl(ctx: click.Context) -> None:
     The REPL provides an interactive chat interface with Nexus.
     Use /help inside the REPL for available slash commands.
     """
+    from .welcome import display_welcome
+    display_welcome()
+
     from ..cli.repl import run_repl
     from ..config import load_config
 
@@ -1126,8 +1164,9 @@ def automation_install_browser(browser: str, with_deps: bool) -> None:
 
 
 # Initialize providers from config
-def initialize_providers(config: NexusConfig) -> None:
+def initialize_providers(config) -> None:
     """Initialize providers from configuration."""
+    from nexus.providers import get_manager
     manager = get_manager()
     for _name, cfg in config.providers.items():
         manager.add_provider(cfg)
@@ -1138,9 +1177,25 @@ def initialize_providers(config: NexusConfig) -> None:
 
 def main():
     """Main entry point."""
+    # Fast path for version and help to keep it 'clean'
+    if len(sys.argv) > 1 and sys.argv[1] in ("--version", "--help"):
+        cli(obj={})
+        return
+
+    from nexus.config import load_config
     # Load config and initialize
     config = load_config()
     config.ensure_dirs()
+    
+    # Check for providers
+    if not config.providers:
+        from nexus.doctor import run_doctor
+        # If we are in the main CLI (not tui/voice/repl), assume interactive unless --non-interactive
+        is_interactive = sys.stdin.isatty() and "--non-interactive" not in sys.argv
+        run_doctor(interactive=is_interactive)
+        # Reload config after setup
+        config = load_config()
+
     initialize_providers(config)
 
     # Run CLI

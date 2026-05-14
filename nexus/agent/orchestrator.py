@@ -5,14 +5,21 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Callable
 
 from ..providers import ProviderManager, Message, ToolCall
 from ..tools import ToolRegistry, ToolResult
+from ..errors import NexusError, ToolError
+from ..utils import format_error
 from ..memory import Memory
 from ..thinking import ThinkingEngine, ThinkingState, get_thinking_engine
 from ..agents import MultiAgentTeam, AgentRole, init_team, get_team
 from ..plugins import get_plugin_manager
+from ..safety import get_safety_engine
+from ..orchestrator.decomposer import LLMAwareDecomposer
+from ..orchestrator.executor import ExecutionEngine
+from ..agent.reflection import ReflectionEngine
+from pathlib import Path
 
 
 def estimate_tokens(text: str) -> int:
@@ -107,22 +114,70 @@ class AgentOrchestrator:
         self.pm = provider_manager
         self.tools = tool_registry
         self.memory = memory
+        self.decomposer = LLMAwareDecomposer()
+        self.executor = ExecutionEngine(
+            self.tools, 
+            self._execute_tool_callback,
+            llm_callback=self._execute_llm_callback,
+            provider_manager=self.pm
+        )
         self.config = config or AgentConfig()
-        self._turn_count = 0
+        self.reflection_engine = ReflectionEngine(Path("./.nexus/sessions"))
+        
+        # ... rest of init ...
         self._tool_call_count = 0
         self._messages: list[Message] = []
         self._history: list[Turn] = []
         self._thinking = get_thinking_engine()
         self._thinking_callback = None
+        self._ui_callback: Callable[[str, Any], None] | None = None  # UI Bridge
         self._total_tokens = 0
+        self._turn_count = 0
         self._tool_stats: dict[str, dict] = {}
         self._team: MultiAgentTeam | None = None
 
-    def init_team(self, lead_name: str = "nexus") -> MultiAgentTeam:
-        """Initialize the multi-agent team."""
-        if self._team is None:
-            self._team = init_team(lead_name=lead_name, pm=self.pm)
-        return self._team
+    async def _execute_tool_callback(self, name: str, args: dict[str, Any]) -> ToolResult:
+        """Bridge for ExecutionEngine to call tools."""
+        tool = self.tools.get(name)
+        if not tool:
+            return ToolResult(success=False, content="", error=f"Tool {name} not found")
+        return await tool.execute(**args)
+
+    async def _execute_llm_callback(self, prompt: str, provider_name: str | None = None) -> str:
+        """Bridge for ExecutionEngine to call LLM."""
+        messages = [Message(role="user", content=prompt)]
+        response = await self.pm.complete(messages, provider_name=provider_name)
+        return response.content
+
+    def set_ui_callback(self, callback: Callable[[str, Any], None]):
+        """Set a callback to notify the UI of state changes."""
+        self._ui_callback = callback
+
+    def _notify_ui(self, event_type: str, data: Any):
+        """Notify the UI of a state change."""
+        if self._ui_callback:
+            self._ui_callback(event_type, data)
+
+    async def run_complex_task(self, goal: str):
+        """Unified entry point for decomposing and executing complex tasks."""
+        try:
+            # 1. Decompose
+            plan = await self.decomposer.decompose(goal)
+            self._notify_ui("thinking", {"description": f"Decomposed into {len(plan.steps)} steps"})
+            
+            # 2. Execute steps
+            results = []
+            for step in plan.steps:
+                self._notify_ui("thinking", {"description": f"Executing: {step.description}"})
+                result = await self.executor.execute_step(step)
+                results.append(result)
+            
+            self.reflection_engine.perform_reflection()
+            return results
+        except Exception as e:
+            error_msg = format_error(e)
+            self._notify_ui("error", error_msg)
+            raise NexusError(str(e), user_friendly=error_msg)
 
     @property
     def team(self) -> MultiAgentTeam | None:
@@ -226,7 +281,7 @@ class AgentOrchestrator:
                     self.config.context_prune_ratio,
                 )
 
-            if self.config.stream and stream_callback:
+            if self.config.stream and stream_callback and not tool_defs:
                 tool_calls_accumulated = []
                 accumulated = ""
 
@@ -289,7 +344,7 @@ class AgentOrchestrator:
         raise RuntimeError(f"Max turns ({self.config.max_turns}) reached without final response")
 
     async def _execute_tool(self, tool_call, turn: Turn, depth: int = 0) -> ToolResult:
-        """Execute a tool call with reflection on failure."""
+        """Execute a tool call with safety checks and reflection on failure."""
         name = tool_call.name
         args = tool_call.arguments if isinstance(tool_call.arguments, dict) else {}
 
@@ -299,6 +354,29 @@ class AgentOrchestrator:
             tool_name=name,
             tool_args=args
         )
+
+        # 1. Safety Check
+        from ..safety import get_safety_engine
+        safety = get_safety_engine()
+        context = {"tool": name, "args": args}
+        for path_key in ("path", "filePath", "file_path"):
+            if path_key in args:
+                context["path"] = args[path_key]
+                break
+        if "command" in args:
+            context["command"] = args["command"]
+
+        violations = safety.check(context)
+        proceed, reason = safety.should_proceed(violations)
+        if not proceed:
+            self._thinking.finish_step(exec_step, error=f"Safety Block: {reason}")
+            return ToolResult(success=False, content=f"Blocked by Safety: {reason}", error=reason)
+
+        if name == "Read":
+            for path_key in ("path", "filePath", "file_path"):
+                if path_key in args:
+                    safety.mark_file_read(args[path_key])
+                    break
 
         plugin_manager = get_plugin_manager()
         ctx = {"orchestrator": self, "turn": turn}
@@ -314,12 +392,23 @@ class AgentOrchestrator:
             result = await tool.execute(**args)
             result = plugin_manager.call_result_hooks(name, result, ctx)
 
+            # 2. The Refiner's Fire (Integrity Validation)
+            if result.success and name in ("write", "edit"):
+                validation_passed, validation_error = await self._run_refiners_fire(args.get("path"))
+                if not validation_passed:
+                    result.success = False
+                    result.content = f"[REJECTED BY FIRE] The work was performed, but it failed the integrity check:\\n{validation_error}\\n\\n[RECOVERY] I have detected an impurity in the logic. You must fix this error before proceeding."
+
             if result.success or depth > 0:
                 self._thinking.finish_step(exec_step, result=result.content[:200] if result.content else "")
                 return result
 
+            # 3. Deterministic Recovery Hints
+            if not result.success:
+                result.content = await self._handle_tool_failure(name, args, result.error or result.content)
+
             if self.config.verbose:
-                print(f"\n[nexus] Tool '{name}' failed (attempt {attempt+1}): {result.error}")
+                print(f"\\n[nexus] Tool '{name}' failed (attempt {attempt+1}): {result.error}")
 
             if attempt < self.config.reflection_max_retries - 1 and self.config.reflection_enabled:
                 reflection = await self._reflect_on_failure(name, args, result.error or "")
@@ -330,6 +419,53 @@ class AgentOrchestrator:
 
         self._thinking.finish_step(exec_step, error=result.error or "Tool failed")
         return result
+
+    async def _run_refiners_fire(self, path: str | None) -> tuple[bool, str | None]:
+        """Perform a mandatory integrity check on modified code."""
+        if not path or not os.path.exists(path):
+            return True, None
+        try:
+            if path.endswith(".py"):
+                import ast
+                with open(path, "r", encoding="utf-8") as f:
+                    ast.parse(f.read())
+            elif path.endswith(".json"):
+                import json
+                with open(path, "r", encoding="utf-8") as f:
+                    json.load(f)
+            elif path.endswith((".yaml", ".yml")):
+                import yaml
+                with open(path, "r", encoding="utf-8") as f:
+                    yaml.safe_load(f)
+            return True, None
+        except Exception as e:
+            return False, str(e)
+
+    async def _handle_tool_failure(self, tool_name: str, args: dict, error: str) -> str:
+        """Provide deterministic recovery hints for tool failures."""
+        import os
+        user_friendly_error = format_error(error)
+        hint = f"Tool '{tool_name}' failed: {user_friendly_error}"
+        if tool_name == "edit" and "context mismatch" in error.lower():
+            path = args.get("path")
+            old_string = args.get("old_string")
+            if path and os.path.exists(path):
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                if old_string and old_string in content:
+                    lines = content.splitlines()
+                    for i, line in enumerate(lines):
+                        if old_string in line:
+                            context_block = "\n".join(lines[max(0, i-2):min(len(lines), i+3)])
+                            hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i+1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
+                            break
+                else:
+                    hint += f"\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
+        elif tool_name == "bash" and "not found" in error.lower():
+            hint += "\n\n[RECOVERY HINT] The command was not found. If this is a new tool, you might need to install it via 'apt install' or 'pip install'. In Termux, try 'pkg install'."
+        elif "file not found" in error.lower() or "no such file" in error.lower():
+            hint += "\n\n[RECOVERY HINT] Verify the path exists using 'list' or 'glob'. Paths should usually be relative to the project root."
+        return hint
 
     async def _reflect_on_failure(
         self, tool_name: str, args: dict, error: str

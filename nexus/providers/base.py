@@ -147,8 +147,10 @@ class OpenAIProvider(BaseProvider):
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
 
+        import json as _json
         response = await client.post("/chat/completions", json=payload)
-        response.raise_for_status()
+        if response.status_code != 200:
+            response.raise_for_status()
         data = response.json()
 
         return self._parse_response(data)
@@ -172,10 +174,10 @@ class OpenAIProvider(BaseProvider):
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-
-        async with client.stream("POST", "/chat/completions", json=payload) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
+        
+        response = await client.post("/chat/completions", json=payload)
+        response.raise_for_status()
+        async for line in response.aiter_lines():
                 if not line.startswith("data: "):
                     continue
                 data = line[6:]
@@ -241,13 +243,18 @@ class OpenAIProvider(BaseProvider):
         if "tool_calls" in delta:
             for tc in delta["tool_calls"]:
                 if tc.get("function"):
+                    args_str = tc["function"].get("arguments", "")
+                    try:
+                        args = json.loads(args_str) if args_str else {}
+                    except json.JSONDecodeError:
+                        args = {}  # Incomplete JSON, skip for now
                     tool_call = ToolCall(
                         id=tc.get("id", ""),
-                        name=tc["function"]["name"],
-                        arguments=json.loads(tc["function"]["arguments"]) if tc["function"].get("arguments") else {},
+                        name=tc["function"].get("name", ""),
+                        arguments=args,
                     )
                     break
-
+        
         return StreamChunk(
             content=content,
             tool_call=tool_call,

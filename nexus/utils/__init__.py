@@ -1,20 +1,14 @@
 """Utilities for Nexus."""
 
 import asyncio
-<<<<<<< HEAD
-import sys
-from typing import Any, Callable, TypeVar
-=======
 import logging
 import re
-from typing import Any, TypeVar
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+import sys
+from typing import Any, Callable, TypeVar
 
 T = TypeVar("T")
 
 
-<<<<<<< HEAD
-=======
 def get_logger(name: str) -> logging.Logger:
     """Get a configured logger instance."""
     logger = logging.getLogger(name)
@@ -28,7 +22,6 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 def run_async(coro: Any) -> Any:
     """Run an async function in a sync context."""
     try:
@@ -38,10 +31,6 @@ def run_async(coro: Any) -> Any:
 
     if loop and loop.is_running():
         import concurrent.futures
-<<<<<<< HEAD
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, coro)
             return future.result()
@@ -82,32 +71,24 @@ def pluralize(count: int, singular: str, plural: str | None = None) -> str:
     if count == 1:
         return singular
     return plural or singular + "s"
-<<<<<<< HEAD
-=======
 
 
 SENSITIVE_PATTERNS = [
     (
-        re.compile(r'([a-zA-Z0-9_-]+[_-]?key["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]{8,})', re.I),
+        re.compile(r'\b([a-zA-Z0-9_-]*key["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]{8,})', re.I),
         r"\1[REDACTED]",
     ),
-    (re.compile(r"(bearer\s+)([a-zA-Z0-9_\-\.]{10,})", re.I), r"\1[REDACTED]"),
-    (re.compile(r"(ghp_[a-zA-Z0-9]{36})"), "[GITHUB_TOKEN]"),
-    (re.compile(r"(sk-[a-zA-Z0-9]{20,})"), "[API_KEY]"),
-    (re.compile(r"(xai-[a-zA-Z0-9_-]{20,})"), "[XAI_KEY]"),
+    (re.compile(r"\b(bearer\s+)([a-zA-Z0-9_\-\.]{10,})", re.I), r"\1[REDACTED]"),
+    (re.compile(r"\b(ghp_[a-zA-Z0-9]{36})\b"), "[GITHUB_TOKEN]"),
+    (re.compile(r"\b(sk-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
+    (re.compile(r"\b(xai-[a-zA-Z0-9_-]{20,})\b"), "[XAI_KEY]"),
     (re.compile(r"/home/[a-zA-Z0-9_]+/"), "/home/[USER]/"),
-    (re.compile(r"C:\\Users\\[a-zA-Z0-9_]+\\"), "C:\\Users\\[USER]\\"),
+    (re.compile(r"C:\\Users\\[a-zA-Z0-9_]+\\"), r"C:\\Users\\[USER]\\"),
 ]
 
 
 def sanitize_error(error: str | Exception, max_length: int = 200) -> str:
-    """Sanitize an error message to prevent information disclosure.
-
-    Removes or redacts:
-    - API keys and tokens
-    - File paths with usernames
-    - Bearer tokens
-    """
+    """Sanitize an error message to prevent information disclosure."""
     if isinstance(error, Exception):
         error = str(error)
 
@@ -119,4 +100,19 @@ def sanitize_error(error: str | Exception, max_length: int = 200) -> str:
         sanitized = sanitized[:max_length] + "..."
 
     return sanitized
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+
+
+from ..errors import NexusError
+
+def format_error(error: Exception | str) -> str:
+    """Format an exception or error string into a user-friendly message."""
+    if isinstance(error, NexusError):
+        return error.user_friendly
+    if isinstance(error, Exception):
+        msg = str(error)
+        if "timeout" in msg.lower():
+            return "The request timed out. Please check your connection and try again."
+        elif "not found" in msg.lower():
+            return "The requested resource was not found."
+        return f"An unexpected error occurred: {truncate(msg, 50)}"
+    return str(error)

@@ -4,36 +4,6 @@ Enables automatic spawning of sub-agents (planner, coder, reviewer, tester, rese
 that collaborate on tasks together in a shared team chat.
 """
 
-<<<<<<< HEAD
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable
-import asyncio
-import uuid
-import itertools
-
-_team_counter = itertools.count(1)
-_agent_counter = itertools.count(1)
-_msg_counter = itertools.count(1)
-
-def _next_team_id() -> str:
-    return str(next(_team_counter))
-
-def _next_agent_id() -> str:
-    return str(next(_agent_counter))
-
-def _next_msg_id() -> str:
-    return str(next(_msg_counter))
-
-class AgentRole(Enum):
-    LEAD = "lead"           # Main Nexus agent, coordinates
-    PLANNER = "planner"     # Breaks down tasks
-    CODER = "coder"         # Writes code
-    REVIEWER = "reviewer"   # Reviews and spots issues
-    TESTER = "tester"       # Writes and runs tests
-    RESEARCHER = "researcher" # Web search, docs lookup
-=======
 import asyncio
 import json
 from collections.abc import Callable
@@ -43,8 +13,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-
 _team_counter = 0
+_agent_counter = 0
 _msg_counter = 0
 
 
@@ -54,39 +24,16 @@ def _next_team_id() -> str:
     return f"team-{_team_counter}"
 
 
-def _next_msg_id() -> str:
-    global _msg_counter
-    _msg_counter += 1
-    return f"m{_msg_counter}"
-
-
-class AgentRole(Enum):
-    LEAD = "lead"
-    PLANNER = "planner"
-    CODER = "coder"
-    REVIEWER = "reviewer"
-    TESTER = "tester"
-    RESEARCHER = "researcher"
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
-
-class AgentStatus(Enum):
-    IDLE = "idle"
-    RUNNING = "running"
-    WAITING = "waiting"
-    COMPLETE = "complete"
-    ERROR = "error"
-
-<<<<<<< HEAD
-=======
-
-_agent_counter = 0
-
-
 def _next_agent_id() -> str:
     global _agent_counter
     _agent_counter += 1
     return f"nx-{_agent_counter:03d}"
+
+
+def _next_msg_id() -> str:
+    global _msg_counter
+    _msg_counter += 1
+    return f"m{_msg_counter}"
 
 
 @dataclass
@@ -96,7 +43,7 @@ class AgentTemplate:
     name: str
     display_name: str
     description: str
-    agents: list[tuple[AgentRole, str]]  # (Role, Specialized Prompt)
+    agents: list[tuple["AgentRole", str]]  # (Role, Specialized Prompt)
     workflow: list[str]  # Steps for the lead agent to coordinate
 
 
@@ -212,7 +159,23 @@ class TemplateManager:
             json.dump(data, f, indent=2)
 
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+class AgentRole(Enum):
+    LEAD = "lead"
+    PLANNER = "planner"
+    CODER = "coder"
+    REVIEWER = "reviewer"
+    TESTER = "tester"
+    RESEARCHER = "researcher"
+
+
+class AgentStatus(Enum):
+    IDLE = "idle"
+    RUNNING = "running"
+    WAITING = "waiting"
+    COMPLETE = "complete"
+    ERROR = "error"
+
+
 @dataclass
 class Agent:
     agent_id: str
@@ -238,10 +201,7 @@ class Agent:
             "spawned_at": self.spawned_at.isoformat(),
         }
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 @dataclass
 class TeamMessage:
     msg_id: str
@@ -251,11 +211,7 @@ class TeamMessage:
     role_in_team: str = "member"  # "lead" or "member"
     timestamp: datetime = field(default_factory=datetime.now)
     msg_type: str = "message"  # "message", "tool_call", "tool_result", "system"
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
     def to_dict(self) -> dict[str, Any]:
         return {
             "msg_id": self.msg_id,
@@ -267,39 +223,11 @@ class TeamMessage:
             "type": self.msg_type,
         }
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 class MultiAgentTeam:
     """Manages a team of agents working on tasks together."""
 
     ROLE_PROMPTS = {
-<<<<<<< HEAD
-        AgentRole.PLANNER: """You are a PLANNER agent. Your job is to break down complex tasks into clear, executable steps. 
-Be specific about what tools to use and what the expected outcome is. 
-When collaborating with other agents, be direct and concise. 
-Use @agentname to mention specific agents.""",
-        
-AgentRole.CODER: """You are a CODER agent. Your job is to write clean, efficient code.
-        Read existing code before modifying. Make small, focused changes.
-        When stuck, ask the planner for clarification. When done, notify the reviewer.
-        Use @planner to ask questions. Use @reviewer to request review.""",
-        
-        AgentRole.REVIEWER: """You are a REVIEWER agent. Your job is to review code changes for bugs, 
-        security issues, style problems, and best practices.
-        Be thorough but constructive. Point out specific issues with line numbers.
-        When you approve, say so clearly. Use @coder to request fixes.""",
-        
-        AgentRole.TESTER: """You are a TESTER agent. Your job is to write comprehensive tests.
-        Cover happy paths and edge cases. Run tests and report results clearly.
-        Use @coder to request test data or fixtures. Use @reviewer if you find bugs.""",
-        
-        AgentRole.RESEARCHER: """You are a RESEARCHER agent. Your job is to find information,
-        documentation, code examples, and best practices online.
-        Cite your sources. Summarize findings concisely.
-        Use @planner or @coder to share relevant findings.""",
-=======
         AgentRole.PLANNER: """You are a PLANNER agent. Your job is to break down complex tasks into clear, executable steps.
 Be specific about what tools to use and what the expected outcome is.
 When collaborating with other agents, be direct and concise.
@@ -319,7 +247,6 @@ Use @coder to request test data or fixtures. Use @reviewer if you find bugs.""",
 documentation, code examples, and best practices online.
 Cite your sources. Summarize findings concisely.
 Use @planner or @coder to share relevant findings.""",
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
     }
 
     ROLE_COLORS = {
@@ -339,24 +266,6 @@ Use @planner or @coder to share relevant findings.""",
         self.team_messages: list[TeamMessage] = []
         self._callbacks: list[Callable] = []
         self._lock = asyncio.Lock()
-<<<<<<< HEAD
-        self._agent_counter = 0
-        self.lead_name = lead_name
-        self.pm = provider_manager
-        self.agents: dict[str, Agent] = {}
-        self.team_messages: list[TeamMessage] = []
-        self._callbacks: list[Callable] = []
-        self._lock = asyncio.Lock()
-        self._agent_counter = 0
-    
-    def spawn(self, role: AgentRole, name: str | None = None, 
-              task: str | None = None, model: str | None = None) -> Agent:
-        """Spawn a new agent with the given role."""
-        self._agent_counter += 1
-        agent_id = str(self._agent_counter)
-        agent_name = name or f"{role.value}-{agent_id}"
-        
-=======
 
     @property
     def lead(self) -> Agent | None:
@@ -374,7 +283,6 @@ Use @planner or @coder to share relevant findings.""",
         agent_id = _next_agent_id()
         agent_name = name or f"{role.value}/{agent_id}"
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         agent = Agent(
             agent_id=agent_id,
             name=agent_name,
@@ -383,47 +291,6 @@ Use @planner or @coder to share relevant findings.""",
             color=self.ROLE_COLORS.get(role, "green"),
             status=AgentStatus.RUNNING,
         )
-<<<<<<< HEAD
-        
-        self.agents[agent_id] = agent
-        
-        self._broadcast_system(f"Spawned: {agent_name} ({role.value})")
-        
-        if task:
-            asyncio.create_task(self._agent_task(agent, task))
-        
-        return agent
-
-    async def _agent_task(self, agent: Agent, task: str) -> None:
-        """Run a task for an agent."""
-        from ..providers import get_manager
-        
-        pm = self.pm or get_manager()
-        system_prompt = self.ROLE_PROMPTS.get(agent.role, "")
-        
-        context = self._build_team_context(agent)
-        messages = [
-            {"role": "system", "content": system_prompt + "\n\n" + context},
-            {"role": "user", "content": task},
-        ]
-        
-        self._broadcast(agent.agent_id, agent.name, 
-                       f"Starting task: {task}", "system")
-        
-        try:
-            response = await pm.complete(messages=messages)
-            content = response.content if hasattr(response, "content") else str(response)
-            
-            self._broadcast(agent.agent_id, agent.name, content, "message")
-            agent.status = AgentStatus.COMPLETE
-            agent.messages.append({"role": "assistant", "content": content})
-            
-            self._broadcast_system(f"✅ {agent.name} complete")
-            
-        except Exception as e:
-            agent.status = AgentStatus.ERROR
-            self._broadcast_system(f"✗ {agent.name} error: {e}")
-=======
 
         self.agents[agent_id] = agent
 
@@ -471,7 +338,6 @@ Use @planner or @coder to share relevant findings.""",
         except Exception as e:
             agent.status = AgentStatus.ERROR
             self._broadcast_system(f"[fail] {agent.name}: {e}")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
     def _build_team_context(self, agent: Agent) -> str:
         """Build context about the team for an agent."""
@@ -488,20 +354,12 @@ Use @planner or @coder to share relevant findings.""",
         context += "- Report completion or issues clearly\n"
         return context
 
-<<<<<<< HEAD
-    def _broadcast(self, agent_id: str, agent_name: str, content: str, 
-                   msg_type: str = "message") -> None:
-        """Broadcast a message to the team."""
-        msg = TeamMessage(
-            msg_id=str(uuid.uuid4())[:8],
-=======
     def _broadcast(
         self, agent_id: str, agent_name: str, content: str, msg_type: str = "message"
     ) -> None:
         """Broadcast a message to the team."""
         msg = TeamMessage(
             msg_id=_next_msg_id(),
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             agent_id=agent_id,
             agent_name=agent_name,
             content=content,
@@ -523,17 +381,12 @@ Use @planner or @coder to share relevant findings.""",
         target = next((a for a in self.agents.values() if a.name == to_name), None)
         if target:
             target.status = AgentStatus.WAITING
-<<<<<<< HEAD
-            self._broadcast(from_agent, self.agents.get(from_agent, Agent("", "", AgentRole.LEAD)).name,
-                           f"@{to_name} {message}", "message")
-=======
             self._broadcast(
                 from_agent,
                 self.agents.get(from_agent, Agent("", "", AgentRole.LEAD)).name,
                 f"@{to_name} {message}",
                 "message",
             )
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
     def on_message(self, callback: Callable) -> None:
         """Register a callback for team messages."""
@@ -542,12 +395,7 @@ Use @planner or @coder to share relevant findings.""",
     def list_agents(self) -> list[Agent]:
         return list(self.agents.values())
 
-<<<<<<< HEAD
-    def get_messages(self, agent_id: str | None = None, 
-                     limit: int = 100) -> list[TeamMessage]:
-=======
     def get_messages(self, agent_id: str | None = None, limit: int = 100) -> list[TeamMessage]:
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         """Get team messages, optionally filtered by agent."""
         msgs = self.team_messages[-limit:]
         if agent_id:
@@ -565,8 +413,6 @@ Use @planner or @coder to share relevant findings.""",
                 lines.append(f"[{timestamp}] {msg.agent_name}: {msg.content}")
         return "\n".join(lines)
 
-<<<<<<< HEAD
-=======
     def clear_agents(self) -> None:
         """Clear all agents from the team."""
         self.agents.clear()
@@ -580,8 +426,8 @@ Use @planner or @coder to share relevant findings.""",
         if not template:
             return False
 
-            self._broadcast_system(f"[load] Template: {template.display_name}")
-            self._broadcast_system(f"Description: {template.description}")
+        self._broadcast_system(f"[load] Template: {template.display_name}")
+        self._broadcast_system(f"Description: {template.description}")
 
         # Spawn specified agents
         for role, spec_prompt in template.agents:
@@ -597,47 +443,28 @@ Use @planner or @coder to share relevant findings.""",
 
         return True
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
     def kill(self, agent_id: str) -> bool:
         """Kill an agent."""
         agent = self.agents.get(agent_id)
         if agent and agent.role != AgentRole.LEAD:
             agent.status = AgentStatus.IDLE
-<<<<<<< HEAD
-            self._broadcast_system(f"⬇️ Terminated: {agent.name}")
-=======
             self._broadcast_system(f"[kill] {agent.name} terminated")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             return True
         return False
 
     def auto_spawn_for_task(self, task: str) -> list[Agent]:
         """Automatically spawn agents based on task complexity."""
         spawned = []
-        task_lower = task.lower()
-<<<<<<< HEAD
-        
-        # Always spawn coder for coding tasks
-        if any(w in task_lower for w in ["build", "create", "write", "add", "implement", "fix", "update"]):
-            spawned.append(self.spawn(AgentRole.CODER))
-        
-        # Spawn planner for complex tasks
-        if any(w in task_lower for w in ["complex", "multiple", "entire", "architecture", "system", "migrate"]):
-            spawned.append(self.spawn(AgentRole.PLANNER))
-        
-        # Spawn reviewer for edits
-        if any(w in task_lower for w in ["review", "check", "audit", "security"]):
-            spawned.append(self.spawn(AgentRole.REVIEWER))
-        
-        # Spawn tester for new code
-        if any(w in task_lower for w in ["test", "coverage", "unit test"]):
-            spawned.append(self.spawn(AgentRole.TESTER))
-        
-        # Spawn researcher for docs/web tasks
-        if any(w in task_lower for w in ["research", "find", "search", "look up", "documentation"]):
-            spawned.append(self.spawn(AgentRole.RESEARCHER))
-        
-=======
+        task_lower = task.lower().strip()
+
+        # Skip conversational messages (greetings, meta-questions)
+        conversational = [
+            "hi", "hello", "hey", "greetings", "good morning", "good afternoon",
+            "who are you", "what are you", "what is your name", "what's your name",
+            "how are you", "thanks", "thank you", "bye", "goodbye",
+        ]
+        if any(p in task_lower for p in conversational) and len(task.split()) <= 8:
+            return []
 
         if any(
             w in task_lower
@@ -660,22 +487,12 @@ Use @planner or @coder to share relevant findings.""",
         if any(w in task_lower for w in ["research", "find", "search", "look up", "documentation"]):
             spawned.append(self.spawn(AgentRole.RESEARCHER, task=task))
 
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         return spawned
 
 
 # Global team
 _team: MultiAgentTeam | None = None
 
-<<<<<<< HEAD
-def get_team() -> MultiAgentTeam | None:
-    return _team
-
-def init_team(lead_name: str = "nexus", pm=None) -> MultiAgentTeam:
-    global _team
-    _team = MultiAgentTeam(lead_name=lead_name, provider_manager=pm)
-    return _team
-=======
 
 def get_team() -> MultiAgentTeam | None:
     return _team
@@ -685,4 +502,5 @@ def init_team(lead_name: str = "nexus", pm=None) -> MultiAgentTeam:
     global _team
     _team = MultiAgentTeam(lead_name=lead_name, provider_manager=pm)
     return _team
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+
+

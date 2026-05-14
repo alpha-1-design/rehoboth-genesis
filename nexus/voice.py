@@ -22,6 +22,8 @@ import wave
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
+from .errors import NexusError
+from .utils import format_error
 
 
 @dataclass
@@ -48,17 +50,17 @@ class TTSProvider(ABC):
     @abstractmethod
     async def speak(self, text: str, config: VoiceConfig) -> bytes:
         """Convert text to audio. Returns WAV/MP3 bytes."""
-        raise NotImplementedError
+        raise NexusError("TTS functionality not implemented.")
 
     @abstractmethod
     async def stream_speak(self, text: str, config: VoiceConfig) -> AsyncIterator[bytes]:
         """Stream audio chunks as they're generated."""
-        raise NotImplementedError
+        raise NexusError("TTS streaming not implemented.")
 
     @abstractmethod
     async def play_audio(self, audio: bytes, config: VoiceConfig) -> None:
         """Play audio bytes through speakers."""
-        raise NotImplementedError
+        raise NexusError("Audio playback not implemented.")
 
 
 class FreeTTSProvider(TTSProvider):
@@ -76,26 +78,36 @@ class FreeTTSProvider(TTSProvider):
     ]
 
     async def speak(self, text: str, config: VoiceConfig) -> bytes:
-        import requests
-        response = requests.post(
-            f"{self.BASE_URL}/tts",
-            json={
-                "text": text,
-                "voice": config.voice,
-                "rate": "+0%",
-                "pitch": "+0Hz",
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
-        file_id = data.get("file_id")
-        if not file_id:
-            raise ValueError(f"FreeTTS returned no file_id: {data}")
+        import httpx
+        
+        max_retries = 3
+        async with httpx.AsyncClient() as client:
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(
+                        f"{self.BASE_URL}/tts",
+                        json={
+                            "text": text,
+                            "voice": config.voice,
+                            "rate": "+0%",
+                            "pitch": "+0Hz",
+                        },
+                        timeout=30,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    file_id = data.get("file_id")
+                    if not file_id:
+                        raise ValueError(f"FreeTTS returned no file_id: {data}")
 
-        audio_resp = requests.get(f"{self.BASE_URL}/audio/{file_id}", timeout=30)
-        audio_resp.raise_for_status()
-        return audio_resp.content
+                    audio_resp = await client.get(f"{self.BASE_URL}/audio/{file_id}", timeout=30)
+                    audio_resp.raise_for_status()
+                    return audio_resp.content
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1 * (attempt + 1))
+                        continue
+                    raise NexusError(f"FreeTTS failed after {max_retries} attempts: {e}")
 
     async def stream_speak(self, text: str, config: VoiceConfig) -> AsyncIterator[bytes]:
         audio = await self.speak(text, config)
@@ -103,23 +115,33 @@ class FreeTTSProvider(TTSProvider):
 
     async def play_audio(self, audio: bytes, config: VoiceConfig) -> None:
         try:
-            import pyaudio
+            try:
+                import pyaudio
+            except ImportError:
+                from .utils.dependencies import ensure_dependency
+                if not ensure_dependency("pyaudio"):
+                    print("[TTS] Audio playback skipped (PyAudio not installed)")
+                    return
+                import pyaudio
+
             import wave as wavelib
 
             wav_data = self._convert_to_wav(audio)
             pa = pyaudio.PyAudio()
-            stream = pa.open(
-                format=pyaudio.paInt16,
-                channels=config.channels,
-                rate=config.sample_rate,
-                output=True,
-            )
-            stream.write(wav_data)
-            stream.stop_stream()
-            stream.close()
-            pa.terminate()
+            try:
+                stream = pa.open(
+                    format=pyaudio.paInt16,
+                    channels=config.channels,
+                    rate=config.sample_rate,
+                    output=True,
+                )
+                stream.write(wav_data)
+                stream.stop_stream()
+                stream.close()
+            finally:
+                pa.terminate()
         except Exception as e:
-            print(f"[TTS] Audio playback skipped (no audio device): {e}")
+            print(f"[TTS] Audio playback skipped (error): {e}")
 
     def _convert_to_wav(self, audio: bytes) -> bytes:
         audio_io = io.BytesIO(audio)
@@ -232,22 +254,34 @@ class STTProvider(ABC):
 
     async def listen(self, config: VoiceConfig, timeout: float = 10.0) -> tuple[bytes, float]:
         """Record audio from microphone. Returns (audio_bytes, duration)."""
-        import pyaudio
+        try:
+            import pyaudio
+        except ImportError:
+            from .utils.dependencies import ensure_dependency
+            if not ensure_dependency("pyaudio"):
+                raise NexusError("PyAudio is required for voice listening but is not installed.")
+            import pyaudio
+
         import wave as wavelib
 
         p = pyaudio.PyAudio()
         frames = []
-        stream = p.open(
-            format=pyaudio.paInt16,
-            channels=config.channels,
-            rate=config.sample_rate,
-            input=True,
-            frames_per_buffer=1024,
-        )
+        try:
+            stream = p.open(
+                format=pyaudio.paInt16,
+                channels=config.channels,
+                rate=config.sample_rate,
+                input=True,
+                frames_per_buffer=1024,
+            )
+        except Exception as e:
+            p.terminate()
+            raise NexusError(f"Failed to open microphone: {e}")
 
         silence_start = None
         silence_threshold = int(config.silence_threshold)
         is_speaking = False
+        start_time = asyncio.get_event_loop().time()
 
         try:
             while True:
@@ -265,7 +299,7 @@ class STTProvider(ABC):
                     silence_start = now
                 elif is_speaking and silence_start and (now - silence_start) > config.silence_duration:
                     break
-                elif asyncio.get_event_loop().time() > asyncio.get_event_loop().time() + timeout:
+                elif now > start_time + timeout:
                     break
 
         finally:
@@ -283,18 +317,29 @@ class STTProvider(ABC):
 
     async def listen_until_speech(self, config: VoiceConfig, timeout: float = 30.0) -> tuple[bytes, float]:
         """Wait for speech, then record until silence."""
-        import pyaudio
+        try:
+            import pyaudio
+        except ImportError:
+            from .utils.dependencies import ensure_dependency
+            if not ensure_dependency("pyaudio"):
+                raise NexusError("PyAudio is required for voice listening but is not installed.")
+            import pyaudio
+
         import wave as wavelib
 
         p = pyaudio.PyAudio()
         frames = []
-        stream = p.open(
-            format=pyaudio.paInt16,
-            channels=config.channels,
-            rate=config.sample_rate,
-            input=True,
-            frames_per_buffer=512,
-        )
+        try:
+            stream = p.open(
+                format=pyaudio.paInt16,
+                channels=config.channels,
+                rate=config.sample_rate,
+                input=True,
+                frames_per_buffer=512,
+            )
+        except Exception as e:
+            p.terminate()
+            raise NexusError(f"Failed to open microphone: {e}")
 
         speech_started = False
         silence_start = None
@@ -352,63 +397,65 @@ class AssemblyAISTTProvider(STTProvider):
     BASE_URL = "https://api.assemblyai.com/v2"
 
     async def transcribe(self, audio: bytes, config: VoiceConfig) -> str:
-        import requests
+        import httpx
         api_key = config.stt_api_key or os.environ.get("ASSEMBLYAI_API_KEY", "")
         if not api_key:
             raise ValueError("ASSEMBLYAI_API_KEY required for AssemblyAI STT")
 
-        upload_resp = requests.post(
-            f"{self.BASE_URL}/upload",
-            headers={"authorization": api_key},
-            data=audio,
-            timeout=60,
-        )
-        upload_resp.raise_for_status()
-        audio_url = upload_resp.json()["upload_url"]
+        async with httpx.AsyncClient() as client:
+            upload_resp = await client.post(
+                f"{self.BASE_URL}/upload",
+                headers={"authorization": api_key},
+                content=audio,
+                timeout=60,
+            )
+            upload_resp.raise_for_status()
+            audio_url = upload_resp.json()["upload_url"]
 
-        headers = {"authorization": api_key, "content-type": "application/json"}
-        resp = requests.post(
-            f"{self.BASE_URL}/transcript",
-            headers=headers,
-            json={"audio_url": audio_url},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        transcript_id = resp.json()["id"]
-
-        while True:
-            status_resp = requests.get(
-                f"{self.BASE_URL}/transcript/{transcript_id}",
+            headers = {"authorization": api_key, "content-type": "application/json"}
+            resp = await client.post(
+                f"{self.BASE_URL}/transcript",
                 headers=headers,
+                json={"audio_url": audio_url},
                 timeout=30,
             )
-            status = status_resp.json()
-            if status["status"] == "completed":
-                return status["text"]
-            elif status["status"] == "error":
-                raise RuntimeError(f"AssemblyAI error: {status.get('error')}")
-            await asyncio.sleep(2)
+            resp.raise_for_status()
+            transcript_id = resp.json()["id"]
+
+            while True:
+                status_resp = await client.get(
+                    f"{self.BASE_URL}/transcript/{transcript_id}",
+                    headers=headers,
+                    timeout=30,
+                )
+                status = status_resp.json()
+                if status["status"] == "completed":
+                    return status["text"]
+                elif status["status"] == "error":
+                    raise RuntimeError(f"AssemblyAI error: {status.get('error')}")
+                await asyncio.sleep(2)
 
 
 class DeepgramSTTProvider(STTProvider):
     """Deepgram STT — free tier available."""
 
     async def transcribe(self, audio: bytes, config: VoiceConfig) -> str:
-        import requests
+        import httpx
         api_key = config.stt_api_key or os.environ.get("DEEPGRAM_API_KEY", "")
         if not api_key:
             raise ValueError("DEEPGRAM_API_KEY required for Deepgram STT")
 
-        resp = requests.post(
-            "https://api.deepgram.com/v1/listen",
-            headers={"Authorization": f"Token {api_key}"},
-            data=audio,
-            params={"model": "nova-2", "smart_format": "true"},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["results"]["channels"][0]["alternatives"][0]["transcript"]
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.deepgram.com/v1/listen",
+                headers={"Authorization": f"Token {api_key}"},
+                content=audio,
+                params={"model": "nova-2", "smart_format": "true"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["results"]["channels"][0]["alternatives"][0]["transcript"]
 
 
 class WhisperSTTProvider(STTProvider):
@@ -443,17 +490,18 @@ class FreeTTSSTTProvider(STTProvider):
     """FreeTTS transcription (limited but no key needed)."""
 
     async def transcribe(self, audio: bytes, config: VoiceConfig) -> str:
-        import requests
+        import httpx
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             f.write(audio)
             wav_path = f.name
         try:
-            with open(wav_path, "rb") as f:
-                resp = requests.post(
-                    "https://freetts.org/api/stt",
-                    files={"file": f},
-                    timeout=30,
-                )
+            async with httpx.AsyncClient() as client:
+                with open(wav_path, "rb") as f:
+                    resp = await client.post(
+                        "https://freetts.org/api/stt",
+                        files={"file": f},
+                        timeout=30,
+                    )
             resp.raise_for_status()
             data = resp.json()
             return data.get("text", "")
@@ -514,8 +562,11 @@ class VoiceEngine:
     async def speak(self, text: str) -> None:
         """Convert text to speech and play it."""
         print(f"\n[Nexus]: {text}")
-        audio = await self.tts.speak(text, self.config)
-        await self.tts.play_audio(audio, self.config)
+        try:
+            audio = await self.tts.speak(text, self.config)
+            await self.tts.play_audio(audio, self.config)
+        except Exception as e:
+            print(f"\n[Nexus] Speech Error: {format_error(e)}")
 
     async def transcribe_audio(self, audio: bytes) -> str:
         """Convert audio to text."""
@@ -531,7 +582,7 @@ class VoiceEngine:
                 text = await self.transcribe_audio(audio)
                 return text.strip() if text else None
         except Exception as e:
-            print(f"[STT] Listen error: {e}")
+            print(f"\n[Nexus] Listen Error: {format_error(e)}")
         return None
 
     async def respond_and_speak(self, text: str) -> str:

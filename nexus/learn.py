@@ -129,6 +129,21 @@ class LearningEngine:
         self._session_id: str = ""
         self._lessons_cache: list[Lesson] | None = None
 
+    def get_session_stats(self, session_id: str) -> dict[str, Any]:
+        """Get statistics for a specific session."""
+        failures = [f for f in self._current_session_failures if f.session_id == session_id]
+        
+        # Aggregate tool usage
+        tool_usage: dict[str, int] = {}
+        for f in failures:
+            tool_usage[f.tool_name] = tool_usage.get(f.tool_name, 0) + 1
+            
+        return {
+            "session_id": session_id,
+            "failures": [f.to_dict() for f in failures],
+            "tool_usage": tool_usage
+        }
+
     def start_session(self, session_id: str) -> None:
         """Mark the start of a learning session."""
         self._session_id = session_id

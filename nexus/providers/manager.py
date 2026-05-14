@@ -108,25 +108,39 @@ class ProviderManager:
         provider_names = [active] + [n for n in self.configs.keys() if n != active]
 
         last_error = None
+        max_retries = 2
+        
         for name in provider_names:
-            try:
-                provider = await self.get_provider(name)
-                response = await provider.complete(messages, tools, **kwargs)
+            for attempt in range(max_retries + 1):
+                try:
+                    provider = await self.get_provider(name)
+                    response = await provider.complete(messages, tools, **kwargs)
 
-                # Track costs
-                if response.usage:
-                    rates = self.cost_rates.get(name, {"input": 0, "output": 0})
-                    self.cost_tracker.add_usage(response.usage, rates)
+                    # Track costs
+                    if response.usage:
+                        rates = self.cost_rates.get(name, {"input": 0, "output": 0})
+                        self.cost_tracker.add_usage(response.usage, rates)
 
-                return response
-            except Exception as e:
-                last_error = e
-                cyan = "\033[36m"
-                blue = "\033[34m"
-                dim = "\033[90m"
-                reset = "\033[0m"
-                print(f"  {blue}╼{reset} {dim}nexus/providers{reset} {cyan}{name}{reset} {dim}failed. Switching fallback...{reset}")
-                continue
+                    return response
+                except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as e:
+                    last_error = e
+                    if attempt < max_retries:
+                        wait = (attempt + 1) * 2
+                        print(f"  \033[34m╼\033[0m \033[90mnexus/providers\033[0m \033[33mNetwork error on {name}, retrying in {wait}s...\033[0m")
+                        await asyncio.sleep(wait)
+                        continue
+                    break # Exhausted retries for this provider
+                except Exception as e:
+                    last_error = e
+                    cyan = "\033[36m"
+                    blue = "\033[34m"
+                    dim = "\033[90m"
+                    reset = "\033[0m"
+                    import traceback
+                    print(f"  {blue}╼{reset} {dim}nexus/providers{reset} {cyan}{name}{reset} {dim}failed: {e}{reset}")
+                    # traceback.print_exc() # Too verbose for regular use
+                    print(f"  {blue}╼{reset} {dim}Switching fallback...{reset}")
+                    break
 
         raise RuntimeError(f"All providers failed. Last error: {last_error}")
 
@@ -138,6 +152,10 @@ class ProviderManager:
         **kwargs,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a completion with smart fallback support."""
+        # Disable streaming when tools are needed (OpenCode Zen has issues with streaming tool calls)
+        if tools:
+            raise RuntimeError("Streaming with tools not supported, use complete() instead")
+        
         active = provider_name or self.active_provider
         provider_names = [active] + [n for n in self.configs.keys() if n != active]
         
@@ -160,21 +178,25 @@ class ProviderManager:
         # If we get here, all failed
         raise RuntimeError(f"All providers failed to stream. Last error: {last_error}")
 
-    async def list_models(self, provider_name: str | None = None) -> list[ModelInfo]:
-        """List models from one or all providers."""
-        if provider_name:
-            provider = await self.get_provider(provider_name)
-            return await provider.list_models()
+    async def parallel_complete(
+        self,
+        tasks: list[dict[str, Any]],  # List of {"messages": [], "tools": [], "provider_name": str}
+        **kwargs,
+    ) -> list[Response | Exception]:
+        """Execute multiple completions in parallel using different providers/keys."""
+        async def _run_task(task_data: dict[str, Any]) -> Response:
+            return await self.complete(
+                messages=task_data["messages"],
+                tools=task_data.get("tools"),
+                provider_name=task_data.get("provider_name"),
+                **kwargs
+            )
 
-        all_models = []
-        for name in self.providers:
-            try:
-                provider = self.providers[name]
-                models = await provider.list_models()
-                all_models.extend(models)
-            except Exception:
-                continue
-        return all_models
+        return await asyncio.gather(*[_run_task(t) for t in tasks], return_exceptions=True)
+
+    def get_enabled_providers(self) -> list[str]:
+        """Get names of all enabled providers."""
+        return [name for name, cfg in self.configs.items() if cfg.enabled]
 
     async def switch_model(self, model: str, provider_name: str | None = None) -> None:
         """Switch the model for a provider."""

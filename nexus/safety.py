@@ -32,6 +32,17 @@ class RuleCategory(Enum):
     EXECUTION_ORDER = auto()
 
 
+class SafetyMode(Enum):
+    """Granular safety modes for Nexus."""
+    READ_ONLY = "read_only"             # Only allow read/list/glob/grep
+    SENSITIVE_WRITE = "sensitive"       # Confirm all modifications, block destructive
+    AUTO_GIT = "auto_git"               # Auto-approve non-destructive git, confirm others
+    LOCAL_SANDBOX = "sandbox"           # Restrict execution to a specific directory
+    USER_REVIEW = "user_review"         # Default: confirm dangerous tools
+    UNRESTRICTED = "unrestricted"       # No safety checks (not recommended)
+    STRICT = "strict"                   # All warnings are blocks, strict execution order
+
+
 @dataclass
 class Rule:
     """A single safety rule."""
@@ -214,12 +225,28 @@ class SafetyEngine:
         self._read_files: set[str] = set()
         self._execution_log: list[dict] = []
         self._blocked: bool = False
+        self._mode: SafetyMode = SafetyMode.USER_REVIEW
         self._strict_mode: bool = True
+        self._sandbox_dir: str | None = None
         self._hooks: dict[str, list[Callable]] = {
             "on_block": [],
             "on_warn": [],
             "on_violation": [],
         }
+
+    def set_mode(self, mode: SafetyMode, sandbox_dir: str | None = None) -> None:
+        """Set the current safety mode."""
+        self._mode = mode
+        self._sandbox_dir = sandbox_dir
+        if mode == SafetyMode.STRICT:
+            self._strict_mode = True
+        elif mode == SafetyMode.UNRESTRICTED:
+            self._strict_mode = False
+        self._log("mode_change", mode=mode.value, sandbox=sandbox_dir)
+
+    def get_mode(self) -> SafetyMode:
+        """Get the current safety mode."""
+        return self._mode
 
     def enable_strict_mode(self) -> None:
         """Enable strict mode: WARN becomes BLOCK."""
@@ -257,12 +284,58 @@ class SafetyEngine:
 
     def check(self, context: dict[str, Any]) -> list[RuleViolation]:
         """
-        Check all rules against the given context.
+        Check all rules against the given context, considering the current mode.
         Returns a list of violations (may be empty).
         """
-        violations = []
+        if self._mode == SafetyMode.UNRESTRICTED:
+            return []
 
+        violations = []
+        tool = context.get("tool", "")
+        path = context.get("path", "")
+        command = context.get("command", "")
+
+        # 1. READ_ONLY Mode check
+        if self._mode == SafetyMode.READ_ONLY:
+            safe_tools = {"read", "list", "glob", "grep", "search", "web_fetch"}
+            if tool.lower() not in safe_tools:
+                violations.append(RuleViolation(
+                    rule=Rule("mode-violation", "Read-Only Mode", "Modification tools are blocked in READ_ONLY mode", RuleCategory.SECURITY, RuleLevel.BLOCK),
+                    context=context,
+                    severity="BLOCK",
+                    message="READ_ONLY mode active. Modification tool blocked.",
+                ))
+
+        # 2. LOCAL_SANDBOX Mode check
+        if self._mode == SafetyMode.LOCAL_SANDBOX and self._sandbox_dir:
+            if path and self._sandbox_dir not in path:
+                violations.append(RuleViolation(
+                    rule=Rule("sandbox-violation", "Sandbox Violation", f"Paths must be within {self._sandbox_dir}", RuleCategory.SECURITY, RuleLevel.BLOCK),
+                    context=context,
+                    severity="BLOCK",
+                    message=f"SANDBOX mode active. Access to {path} is blocked.",
+                ))
+
+        # 3. AUTO_GIT Mode check (Special handling for git)
+        if self._mode == SafetyMode.AUTO_GIT and tool == "git":
+            safe_git = {"status", "diff", "log", "branch", "show"}
+            cmd_parts = command.split()
+            if cmd_parts and cmd_parts[0] in safe_git:
+                return [] # Auto-approve safe git commands
+
+        # Standard rule checks
         for rule in self.rules.values():
+            # Special case for EXECUTION_ORDER rules
+            if rule.id == "read-before-edit" and tool in ("edit", "write"):
+                if not self.was_file_read(path):
+                    violations.append(RuleViolation(
+                        rule=rule,
+                        context=context,
+                        severity="BLOCK" if self._strict_mode else "WARN",
+                        message=f"[EXECUTION_ORDER] {rule.name}: {rule.description}",
+                    ))
+                    continue
+
             if rule.matches(context):
                 sev = "BLOCK" if (rule.level == RuleLevel.BLOCK or 
                                   (self._strict_mode and rule.level == RuleLevel.WARN)) else rule.level.name

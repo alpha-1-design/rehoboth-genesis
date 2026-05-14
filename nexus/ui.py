@@ -75,5 +75,5 @@ class ProgressTracker:
     
     def finish(self) -> None:
         elapsed = time.time() - self.start_time
-        sys.stdout.write(f"\r{' ' * 60}\r✅ Done in {elapsed:.1f}s\n")
+        sys.stdout.write(f"\r{' ' * 60}\rDone in {elapsed:.1f}s\n")
         sys.stdout.flush()

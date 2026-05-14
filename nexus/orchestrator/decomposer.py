@@ -251,7 +251,13 @@ class SimpleDecomposer(BaseDecomposer):
         elif "start the server" in task_lower or "run the server" in task_lower or "start it" in task_lower:
             if path and path.endswith(".py"):
                 ctx["test_cmd"] = f"python {path} & sleep 1 && curl http://localhost:8000"
-        elif "pytest" in task_lower or "run tests" in task_lower:
+        elif "run tests" in task_lower:
+            m = re.search(r'run tests with\s+([a-zA-Z0-9_\-\.]+)', task_lower)
+            if m:
+                ctx["test_cmd"] = m.group(1).strip()
+            else:
+                ctx["test_cmd"] = "pytest -v"
+        elif "pytest" in task_lower:
             ctx["test_cmd"] = "pytest -v"
         elif "run in a browser" in task_lower or "open in browser" in task_lower:
             if path and path.endswith('.html'):
@@ -316,6 +322,23 @@ class SimpleDecomposer(BaseDecomposer):
 
         return TaskPlan(task=task, goal=goal, steps=steps)
 
+    def _extract_install_command(self, text_lower: str, context: dict) -> str:
+        setup_with_m = re.search(r'\b(?:setup|install|configure)\s+(?:project|it|this)\s+(?:using|with)\s+([a-zA-Z0-9_\-\.]+)', text_lower)
+        if setup_with_m:
+            tool = setup_with_m.group(1).strip()
+            if tool == "poetry": return "poetry install"
+            if tool == "pipenv": return "pipenv install"
+            if tool == "pnpm": return "pnpm install"
+            if tool == "yarn": return "yarn install"
+            return f"{tool} install"
+        
+        if "npm" in text_lower or "node" in text_lower: return "npm install"
+        if "pip" in text_lower: return "pip install"
+        if "cargo" in text_lower or "rust" in text_lower: return "cargo build"
+        if "go" in text_lower: return "go mod tidy"
+        
+        return context.get("install_cmd", "pip install -r requirements.txt")
+
     def _decompose_multi_action(self, task: str, context: dict) -> list[ExecutionStep]:
         task_lower = task.lower()
         path = context.get("path", "unknown")
@@ -355,7 +378,7 @@ class SimpleDecomposer(BaseDecomposer):
                     wrote = True
 
             elif re.search(r'\b(?:initialize|setup)\s+(?:a\s+)?new\s+(?:project|script)\b', part_lower):
-                cmd = "npm install" if "npm" in task_lower else "pip install"
+                cmd = self._extract_install_command(part_lower, context)
                 sid = self._next_id()
                 deps = [StepDependency(prev_id)] if prev_id else []
                 steps.append(ExecutionStep(
@@ -367,14 +390,25 @@ class SimpleDecomposer(BaseDecomposer):
                 prev_id = sid
 
             elif any(re.search(rf'\b{k}\b(?!\.[a-z]{{1,5}})', part_lower) for k in ["run it", "test it", "execute it", "start it"]) and not is_create_with_run:
-                cmd = test_cmd
+                cmd = ""
+                # Try to extract explicit command like "run it with python3"
+                run_with_m = re.search(r'\b(?:run|test|execute|start)\s+it\s+with\s+([a-zA-Z0-9_\-\.\/ ]+)', part_lower)
+                if run_with_m:
+                    tool = run_with_m.group(1).strip()
+                    cmd = f"{tool} {path}" if path != "unknown" else tool
+                
+                if not cmd and test_cmd:
+                    cmd = test_cmd
+                    
                 if not cmd and wrote and path != "unknown":
                     if path.endswith(".py"): cmd = f"python {path}"
                     elif path.endswith(".js"): cmd = f"node {path}"
                     elif path.endswith(".sh"): cmd = f"bash {path}"
                     elif path.endswith(".ts"): cmd = f"tsc && node {path.replace('.ts','.js')}"
+                
                 if not cmd and ("node" in task_lower or "npm" in task_lower): cmd = "npm start"
                 if not cmd: cmd = "pytest -v" if "pytest" in task_lower else f"python {path}" if path.endswith(".py") else ""
+                
                 if cmd:
                     sid = self._next_id()
                     deps = [StepDependency(prev_id)] if prev_id else []
@@ -387,10 +421,7 @@ class SimpleDecomposer(BaseDecomposer):
                     prev_id = sid
 
             elif "install" in part_lower and ("npm" in task_lower or "pip" in task_lower or "install" in part_lower):
-                cmd = ""
-                if "npm" in task_lower or "node" in task_lower: cmd = "npm install"
-                elif "pip" in task_lower: cmd = "pip install"
-                else: cmd = context.get("install_cmd", "pip install")
+                cmd = self._extract_install_command(part_lower, context)
                 if cmd:
                     sid = self._next_id()
                     deps = [StepDependency(prev_id)] if prev_id else []
@@ -633,10 +664,7 @@ class SimpleDecomposer(BaseDecomposer):
 
         if has_install:
             sid = self._next_id()
-            cmd = context.get("install_cmd", "pip install -r requirements.txt")
-            if "npm" in task_lower or "node" in task_lower: cmd = "npm install"
-            elif "cargo" in task_lower or "rust" in task_lower: cmd = "cargo build"
-            elif "go" in task_lower: cmd = "go mod tidy"
+            cmd = self._extract_install_command(task_lower, context)
             steps.append(ExecutionStep(
                 id=sid, description="Install dependencies",
                 step_type=StepType.BASH, tool_name="Bash",

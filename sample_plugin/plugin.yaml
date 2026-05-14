@@ -1,9 +1,0 @@
-name: sample-plugin
-version: 1.0.0
-description: Sample Nexus plugin demonstrating the plugin system
-author: Nexus Team
-hooks:
-  - ON_TOOL_CALL
-  - ON_RESPONSE
-dependencies: []
-min_nexus_version: "0.1.0"

@@ -1,15 +1,16 @@
 """Interactive REPL for Nexus."""
 
 import asyncio
+import os
 import readline
 import sys
-<<<<<<< HEAD
 import time
 from typing import Any
 
 from ..providers import Message, get_manager
 from ..tools import get_registry, ToolResult
 from ..memory import get_memory
+from ..agent import get_orchestrator
 from ..agents import init_team, get_team, AgentRole, MultiAgentTeam
 from ..thinking import ThinkingEngine, get_thinking_engine, ThinkingState
 from ..ui import LoadingIndicator, ProgressTracker
@@ -22,63 +23,23 @@ from ..self_improve import get_self_improver
 from ..personality import get_personality, Personality
 from ..phone import get_phone_mode, PhoneMode
 from ..voice import get_voice_engine
-=======
-from typing import Any
-
-from nexus.agents import AgentRole, MultiAgentTeam, init_team
-from nexus.learn import get_learning_engine
-from nexus.memory import get_memory
-from nexus.orchestrator import ExecutionEngine, LLMAwareDecomposer, is_structured_task
-from nexus.personality import Personality, get_personality
-from nexus.phone import PhoneMode, get_phone_mode
-from nexus.plan import PlanMode, set_plan_mode
-from nexus.plugins import get_plugin_manager
-from nexus.providers import Message, get_manager
-from nexus.safety import SafetyEngine, get_safety_engine
-from nexus.self_improve import get_self_improver
-from nexus.sessions import get_session_loader
-from nexus.skills import SkillsManager
-from nexus.sync import get_sync_engine
-from nexus.thinking import ThinkingState, get_thinking_engine
-from nexus.tools import ToolResult, get_registry
-from nexus.ui import ProgressTracker
-from nexus.voice import get_voice_engine
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
 
 class REPL:
     """Interactive REPL for Nexus."""
 
     def __init__(self, config: dict[str, Any] | None = None):
-<<<<<<< HEAD
-=======
-        from nexus.cli.task_tracker import TaskTracker
-
-        self.tasks = TaskTracker()
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         self.config = config or {}
-        self.manager = get_manager()
-        self.registry = get_registry()
-        self.memory = get_memory()
+        self.orchestrator = get_orchestrator()
+        self.manager = self.orchestrator.pm
+        self.registry = self.orchestrator.tools
+        self.memory = self.orchestrator.memory
         self.session = self.memory.create_session()
         self.messages: list[Message] = []
         self.running = True
         self.streaming = True
-        self.team: MultiAgentTeam | None = None
-        self.thinking_engine = get_thinking_engine()
-        self._first_token_received = False
-        self._tool_call_count = 0
-        self._total_tool_calls = 0
-        self._start_time = 0.0
-        self._plan_mode: PlanMode | None = None
-        self._plan_active = False
-<<<<<<< HEAD
+        self.team: MultiAgentTeam | None = init_team(lead_name="nexus", pm=self.manager)
         
-=======
-        self._last_failed_tool_call = None
-        self._file_snapshots: dict[str, str] = {}
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         # New systems
         self.safety: SafetyEngine = get_safety_engine()
         self.sync_engine = get_sync_engine()
@@ -86,74 +47,21 @@ class REPL:
         self.improver = get_self_improver()
         self.personality: Personality = get_personality()
         self.phone: PhoneMode = get_phone_mode()
-<<<<<<< HEAD
         
         # Session auto-load
         self.session_loader = get_session_loader()
         
-        # Set up readline
-        self._setup_readline()
-        
-=======
-
-        # Session auto-load
-        self.session_loader = get_session_loader()
-        self.session_loader.start_auto_save(self.session)
-
-        # Plugin system
-        self.plugin_manager = get_plugin_manager()
-
-        # Skills system
-        self.skills = SkillsManager()
-        self.skills.load_all()
-
-        # CLI flags
-        self._yes_flag = self.config.get("yes", False)
-
-        # Set up readline
-        self._setup_readline()
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         # Initialize multi-agent team
         self.team = init_team(lead_name="nexus", pm=self.manager)
         self.team.on_message(self._on_team_message)
 
-<<<<<<< HEAD
-        # Register thinking callback
-        self.thinking_engine.on_update(self._on_thinking_update)
-        
-        # Start learning session
-        self.learning.start_session(self.session.id)
-        
-        # Phone mode preprocessing
-        if self.phone.enabled:
-            print("📱 Phone mode active — type /h for compact help")
-        
-=======
-        # Initialize execution engine
-        self.decomposer = LLMAwareDecomposer(llm_callback=self._llm_plan_callback)
-        self.executor = ExecutionEngine(
-            registry=self.registry,
-            tool_executor=self._execute_tool_wrapper,
-            llm_callback=self._llm_plan_callback,
-        )
+        # Initialize project indexing for Neural Layers
+        from ..memory import ProjectIndexer
+        self.indexer = ProjectIndexer(self.memory)
 
         # Register thinking callback
+        self.thinking_engine = get_thinking_engine()
         self.thinking_engine.on_update(self._on_thinking_update)
-
-        # Start learning session
-        self.learning.start_session(self.session.id)
-
-        # Phone mode preprocessing
-        if self.phone.enabled:
-            cyan = "\033[36m"
-            blue = "\033[34m"
-            dim = "\033[90m"
-            reset = "\033[0m"
-            print(f"  {blue}╼{reset} {dim}nexus/{reset}{cyan}phone{reset} active {dim}— type /h for compact help{reset}")
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
-        self._check_resume_session()
 
     async def _ensure_provider(self) -> None:
         """Ensure a working provider is configured. Auto-setup OpenCode Zen if needed."""
@@ -167,28 +75,13 @@ class REPL:
             pass
 
         # No working provider — try OpenCode Zen free models
-<<<<<<< HEAD
-        print("\n\033[33m⚠ No working AI provider found.\033[0m")
+        print("\n\033[33m[!] No working AI provider found.\033[0m")
         print("Trying OpenCode Zen free models (no API key needed)...\n")
 
         try:
             from ..providers.base import PROVIDER_REGISTRY
             from ..config import ProviderConfig, save_config
             from .. import config as cfg_module
-=======
-        cyan = "\033[36m"
-        blue = "\033[34m"
-        bold = "\033[1m"
-        reset = "\033[0m"
-        
-        print(f"\n  {blue}╼{reset} {cyan}nexus{reset} {bold}provider link lost{reset}")
-        print(f"    {bold}Attempting OpenCode Zen uplink...{reset}\n")
-
-        try:
-            from .. import config as cfg_module
-            from ..config import ProviderConfig, save_config
-            from ..providers.base import PROVIDER_REGISTRY
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
             opencode_config = ProviderConfig(
                 name="opencode-zen",
@@ -202,23 +95,12 @@ class REPL:
                 enabled=True,
             )
 
-<<<<<<< HEAD
             prov = PROVIDER_REGISTRY["openai"]({
                 "api_key": "",
                 "base_url": "https://opencode.ai/zen/v1",
                 "model": "minimax-m2.5-free",
                 "timeout": 120,
             })
-=======
-            prov = PROVIDER_REGISTRY["openai"](
-                {
-                    "api_key": "",
-                    "base_url": "https://opencode.ai/zen/v1",
-                    "model": "minimax-m2.5-free",
-                    "timeout": 120,
-                }
-            )
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             await prov.complete([Message(role="user", content="ping")], None)
 
             # Works — save to config
@@ -232,17 +114,10 @@ class REPL:
             full_config.active_provider = "opencode-zen"
             save_config(full_config)
 
-<<<<<<< HEAD
             print("\033[92m✓ Connected to OpenCode Zen (minimax-m2.5-free)\033[0m\n")
         except Exception as e:
             print(f"\n\033[91m✗ Could not connect to OpenCode Zen: {e}\033[0m")
             print("\nRun \033[1mnexus setup\033[0m to configure a provider manually.\n")
-=======
-            print(f"    {blue}✔{reset} {bold}Connected to OpenCode Zen (minimax-m2.5-free){reset}\n")
-        except Exception as e:
-            print(f"\n    {blue}✘{reset} {bold}Could not connect to OpenCode Zen: {e}{reset}")
-            print(f"    {dim}Run{reset} {cyan}nexus setup{reset} {dim}to configure a provider manually.{reset}\n")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
     def _check_resume_session(self) -> None:
         """Check for previous session and offer to resume."""
@@ -260,44 +135,32 @@ class REPL:
                             if msg["role"] == "user":
                                 self.messages.append(Message(role="user", content=msg["content"]))
                             elif msg["role"] == "assistant":
-<<<<<<< HEAD
                                 self.messages.append(Message(role="assistant", content=msg["content"]))
                         print(f"Resumed session. {len(self.messages)} messages loaded.")
                 else:
                     print("Starting fresh session.")
             except (EOFError, KeyboardInterrupt):
                     print("Starting fresh session.")
-=======
-                                self.messages.append(
-                                    Message(role="assistant", content=msg["content"])
-                                )
-                        cyan = "\033[36m"
-                        blue = "\033[34m"
-                        dim = "\033[90m"
-                        reset = "\033[0m"
-                        print(f"  {blue}╼{reset} {dim}nexus/{reset}{cyan}session{reset} {dim}resumed. {len(self.messages)} entries restored.{reset}")
-                else:
-                    cyan = "\033[36m"
-                    blue = "\033[34m"
-                    dim = "\033[90m"
-                    reset = "\033[0m"
-                    print(f"  {blue}╼{reset} {dim}nexus/{reset}{cyan}session{reset} {dim}starting fresh context.{reset}")
-            except (EOFError, KeyboardInterrupt):
-                cyan = "\033[36m"
-                blue = "\033[34m"
-                dim = "\033[90m"
-                reset = "\033[0m"
-                print(f"  {blue}╼{reset} {dim}nexus/{reset}{cyan}session{reset} {dim}starting fresh context.{reset}")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
     def _check_tool_safety(self, tool_name: str, arguments: dict) -> tuple[bool, ToolResult | None]:
-        """Check tool call against safety rules. Returns (proceed, error_result)."""
+        """Check tool call against safety rules with visual scanning effect."""
+        # Visual "Security Scan" effect
+        import random
+        cyan = "\033[36m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        symbols = ["-", "\\", "|", "/", "◢", "◣", "◤", "◥"]
+        print(f"  {dim}SCANNING PERMISSIONS... {reset}", end="", flush=True)
+        for _ in range(5):
+            s = random.choice(symbols)
+            sys.stdout.write(f"\b{cyan}{s}{reset}")
+            sys.stdout.flush()
+            time.sleep(0.05)
+        sys.stdout.write("\b  \n")
+        
         path_keys = ("path", "filePath", "file_path", "directory", "workdir")
-<<<<<<< HEAD
         context: dict = {"tool": tool_name, "args": arguments}
-=======
-        context: dict = {"tool_name": tool_name}
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         for key in path_keys:
             if key in arguments and arguments[key]:
                 context["path"] = arguments[key]
@@ -309,14 +172,8 @@ class REPL:
         if not violations:
             return True, None
 
-<<<<<<< HEAD
         proceed, reason = self.safety.should_proceed(violations)
         if not proceed:
-=======
-        blocks = [v for v in violations if v.severity == "BLOCK"]
-        if blocks:
-            reason = "\n  ".join(v.message for v in blocks)
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             error = ToolResult(
                 success=False,
                 content=f"[SAFETY BLOCK] {reason}",
@@ -331,11 +188,7 @@ class REPL:
         """Configure readline for better editing."""
         readline.parse_and_bind("tab: complete")
         readline.parse_and_bind("set editing-mode vi")
-<<<<<<< HEAD
         
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         # History file
         histfile = self._get_histfile()
         try:
@@ -347,98 +200,8 @@ class REPL:
     def _get_histfile(self) -> str:
         """Get the history file path."""
         from pathlib import Path
-<<<<<<< HEAD
         return str(Path.home() / ".nexus" / ".history")
 
-=======
-
-        return str(Path.home() / ".nexus" / ".history")
-
-    async def _execute_single_tool(self, tool_call, tool) -> ToolResult:
-        """Execute a single tool call and return the result."""
-        exec_step = self.thinking_engine.start_step(
-            ThinkingState.EXECUTING,
-            f"Calling tool: {tool_call.name}",
-            tool_name=tool_call.name,
-            tool_args=tool_call.arguments,
-        )
-        proceed, error_result = self._check_tool_safety(tool_call.name, tool_call.arguments)
-        if not proceed:
-            result = error_result
-        else:
-            if tool_call.name == "Read":
-                for path_key in ("path", "filePath", "file_path"):
-                    if path_key in tool_call.arguments:
-                        self.safety.mark_file_read(tool_call.arguments[path_key])
-                        break
-            if tool_call.name == "Write":
-                path_key = next((k for k in ("path", "filePath", "file_path") if k in tool_call.arguments), None)
-                if path_key:
-                    path = tool_call.arguments[path_key]
-                    from pathlib import Path
-                    if Path(path).exists():
-                        self._file_snapshots[path] = Path(path).read_text()
-            ctx = {"session_id": self.session.id}
-            modified_args = self.plugin_manager.call_tool_hooks(tool_call.name, tool_call.arguments, ctx)
-            result = await tool.execute(**modified_args)
-            result = self.plugin_manager.call_result_hooks(tool_call.name, result, ctx)
-        if not result.success:
-            self._last_failed_tool_call = tool_call
-            self.learning.record_failure(
-                tool_name=tool_call.name,
-                args=tool_call.arguments,
-                error=result.error or result.content,
-                context={"session": self.session.id},
-            )
-        self.thinking_engine.finish_step(
-            exec_step,
-            result=result.content[:200] if result.content else "",
-        )
-        return result
-
-    async def _execute_tool_wrapper(self, tool_name: str, args: dict) -> ToolResult:
-        """Wrapper for executing tools via the execution engine."""
-        tool = self.registry.get(tool_name)
-        if not tool:
-            return ToolResult(success=False, content="", error=f"Tool '{tool_name}' not found")
-        
-        tool_call = type("ToolCall", (), {"name": tool_name, "arguments": args})()
-        return await self._execute_single_tool(tool_call, tool)
-
-    async def _llm_plan_callback(self, prompt: str) -> str:
-        """Callback for LLM-assisted planning."""
-        messages = [
-            Message(role="system", content="You are a task planning assistant. Create a JSON plan."),
-            Message(role="user", content=prompt),
-        ]
-        tools = self.registry.to_openai_format()
-        
-        try:
-            response = await self.manager.complete(messages, tools)
-            if response.content:
-                return response.content
-            if response.tool_calls:
-                return str(response.tool_calls)
-            return ""
-        except Exception as e:
-            return f"Planning error: {e}"
-
-    def _manage_context_window(self) -> None:
-        """Truncate messages if context window is getting too large."""
-        max_messages = 200
-        if len(self.messages) <= max_messages:
-            return
-        keep = max_messages // 2
-        removed = len(self.messages) - keep
-        self.messages = self.messages[-keep:]
-        print(f"\n[context] Truncated {removed} older messages to manage context window.")
-
-    async def _retry_tool(self, tool_call, tool) -> None:
-        """Retry a failed tool call."""
-        result = await self._execute_single_tool(tool_call, tool)
-        print(f"Result: {result.content[:200] if result.content else result.error}")
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
     def _save_history(self) -> None:
         """Save command history."""
         histfile = self._get_histfile()
@@ -450,10 +213,6 @@ class REPL:
     async def _llm_voice_callback(self, text: str) -> str:
         """Send voice input to LLM and return response text."""
         from ..providers import Message
-<<<<<<< HEAD
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         messages = [Message(role="system", content=self._get_system_prompt())] + self.messages
         messages.append(Message(role="user", content=text))
 
@@ -465,21 +224,10 @@ class REPL:
                 tool = self.registry.get(tc.name)
                 if tool:
                     result = await tool.execute(**tc.arguments)
-<<<<<<< HEAD
                     messages.append(Message(
                         role="tool", content=result.content,
                         name=tc.name, tool_call_id=tc.id,
                     ))
-=======
-                    messages.append(
-                        Message(
-                            role="tool",
-                            content=result.content,
-                            name=tc.name,
-                            tool_call_id=tc.id,
-                        )
-                    )
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
             response = await self.manager.complete(messages, tools)
             self.messages.append(Message(role="user", content=text))
@@ -499,51 +247,78 @@ class REPL:
             while engine._running:
                 await asyncio.sleep(0.5)
 
-    def _get_prompt(self) -> str:
-<<<<<<< HEAD
-        """Get the command prompt."""
-        return "\033[1;36mnexus\033[0m> "
-=======
-        """Get the branded command prompt."""
-        cyan = "\033[36m"
-        bold = "\033[1m"
-        blue = "\033[34m"
-        reset = "\033[0m"
-        return f"{blue}⫸{cyan}nexus{reset} {bold}»{reset} "
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+    async def _handle_orchestrator_event(self, event):
+        """Map orchestrator thinking events to REPL visual effects."""
+        # event is a tuple of ("type", step)
+        event_type, step = event
+
+        if step.state == ThinkingState.ANALYZING:
+            self._show_context_pulse()
+        elif step.state == ThinkingState.EXECUTING:
+            if step.tool_name in ("write", "edit"):
+                path = step.tool_args.get("path", "file")
+                self._show_kinetic_stream(path)
+            else:
+                self._show_tool_start(step.tool_name)
+        elif step.state == ThinkingState.COMPLETE:
+            self._show_task_complete()
+        elif step.state == ThinkingState.ERROR:
+            print(f"\n\033[91m◈ ERROR: {step.detail}\033[0m")
+
+    async def _stream_to_console(self, content: str):
+        """Callback for streaming assistant responses."""
+        print(content, end="", flush=True)
 
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for the agent."""
-        context = self.memory.get_context_summary()
+        """Get the multi-layered system prompt for the agent (The Memory Harness)."""
+        # Layer 1: Core Identity & Voice
         voice_prompt = self.personality.get_voice_system_prompt()
-<<<<<<< HEAD
+        
+        # Layer 2: Safety Mode & Operational Guidelines
+        safety_mode = self.safety.get_mode().name
+        safety_guidelines = f"Current Safety Mode: {safety_mode}\n"
+        if safety_mode == "READ_ONLY":
+            safety_guidelines += "- You are in READ-ONLY mode. Do not attempt to modify files.\n"
+        elif safety_mode == "STRICT":
+            safety_guidelines += "- STRICT mode active. You MUST read files before editing and validate after writing.\n"
+
+        # Layer 3: Project Architecture & Environment
+        project_summary = "Environment: Termux (Android)\n"
+        project_summary += f"Project Structure: {self.indexer.get_summary()}\n"
+        
+        # Layer 4: Active Working Memory (Last 5 files read/edited)
+        recent_files = self.safety.get_read_files()[-5:]
+        working_memory = ""
+        if recent_files:
+            working_memory = "Recently Accessed Files (Working Memory):\n"
+            for f in recent_files:
+                working_memory += f"- {f}\n"
+
+        # Layer 5: User Facts & Session Context
+        user_context = self.memory.get_context_summary()
 
         return f"""{voice_prompt}
-=======
-        skills_context = self.skills.get_context()
 
-        prompt = f"""{voice_prompt}
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+### OPERATIONAL GUIDELINES
+{safety_guidelines}
+- You are an AI coding assistant powered by Nexus.
+- Focus on being helpful, accurate, and efficient.
+- Use tools to gather information before making decisions.
 
-You are an AI coding assistant powered by Nexus.
+### PROJECT CONTEXT
+{project_summary}
 
-You have access to the following tools:
+### WORKING MEMORY
+{working_memory}
+
+### USER & SESSION MEMORY
+{user_context}
+
+### AVAILABLE TOOLS
 {self._format_tools()}
 
-Memory context:
-{context}
-<<<<<<< HEAD
-
 When using tools, always provide clear feedback about what you're doing.
-Focus on being helpful, accurate, and efficient.
 """
-=======
-"""
-        if skills_context:
-            prompt += f"\n{skills_context}\n"
-        prompt += "\nWhen using tools, always provide clear feedback about what you're doing.\nFocus on being helpful, accurate, and efficient.\n"
-        return prompt
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
     def _format_tools(self) -> str:
         """Format tools for the system prompt."""
@@ -553,31 +328,25 @@ Focus on being helpful, accurate, and efficient.
         return "\n".join(lines)
 
     async def _generate_response(self, user_input: str, print_result: bool = True) -> str:
-        """Generate a response from the AI."""
+        """Generate a response from the AI with dynamic context pulsing."""
+        # Check for proactive insights if user is 'free' (idle/short input)
+        if len(user_input.split()) < 3:
+            insight = self._get_proactive_insight()
+            if insight:
+                print(f"\n  \033[36m◈ PROACTIVE INSIGHT: {insight}\033[0m")
+
+        # Visual 'Context Pulse'
+        self._show_context_pulse()
+        
         # Add user message
         self.messages.append(Message(role="user", content=user_input))
         self.session.messages.append({"role": "user", "content": user_input})
 
-<<<<<<< HEAD
-=======
-        # Auto-activate skills based on task
-        self.skills.auto_activate(user_input)
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         # Auto-spawn agents for complex tasks
         if self.team:
             spawned = self.team.auto_spawn_for_task(user_input)
             if spawned:
-<<<<<<< HEAD
-                print(f"\n[team] Auto-spawned: {', '.join(a.name for a in spawned)}")
-=======
-                cyan = "\033[36m"
-                blue = "\033[34m"
-                dim = "\033[90m"
-                reset = "\033[0m"
-                agents = ", ".join(f"{cyan}{a.name}{reset}" for a in spawned)
-                print(f"  {blue}╼{reset} {dim}nexus/{reset}{cyan}team{reset} {dim}auto-spawned:{reset} {agents}")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+                self._show_neural_branching(spawned)
 
         # Build messages with system prompt
         messages = [Message(role="system", content=self._get_system_prompt())] + self.messages
@@ -586,8 +355,7 @@ Focus on being helpful, accurate, and efficient.
         tools = self.registry.to_openai_format()
 
         try:
-            if self.streaming:
-<<<<<<< HEAD
+            if self.streaming and not tools:
                 response_text = ""
                 tool_results = []
 
@@ -609,239 +377,6 @@ Focus on being helpful, accurate, and efficient.
                         tool = self.registry.get(tool_call.name)
                         if tool:
                             proceed, error_result = self._check_tool_safety(tool_call.name, tool_call.arguments)
-=======
-                from nexus.providers.base import ToolCall
-                import json as json_module
-
-                max_tool_rounds = 10
-                tool_round = 0
-                final_content = ""
-                streaming_done = True
-
-                while tool_round < max_tool_rounds:
-                    tool_round += 1
-                    response_text = ""
-                    complete_tool_calls: list[ToolCall] = []
-                    collected_raw_tool_calls: list[dict] = []
-
-                    async for chunk in self.manager.stream(messages, tools):
-                        if chunk.content:
-                            self._first_token_received = True
-                            print(chunk.content, end="", flush=True)
-                            response_text += chunk.content
-
-                        if chunk.raw_tool_call:
-                            collected_raw_tool_calls.append(chunk.raw_tool_call)
-
-                        if chunk.done:
-                            break
-
-                    print()
-
-                    if not collected_raw_tool_calls:
-                        final_content = response_text
-                        break
-
-                    raw_tool_calls = None
-                    if collected_raw_tool_calls:
-                        raw_by_index: dict[int, dict] = {}
-                        for raw_tc in collected_raw_tool_calls:
-                            idx = raw_tc.get("index", 0)
-                            if idx not in raw_by_index:
-                                raw_by_index[idx] = {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
-                            if raw_tc.get("id"):
-                                raw_by_index[idx]["id"] = raw_tc["id"]
-                            if raw_tc.get("function", {}).get("name"):
-                                raw_by_index[idx]["function"]["name"] = raw_tc["function"]["name"]
-                            args_val = raw_tc.get("function", {}).get("arguments")
-                            if args_val is not None:
-                                raw_by_index[idx]["function"]["arguments"] += args_val
-                        raw_tool_calls = list(raw_by_index.values())
-
-                        for raw_tc in raw_tool_calls:
-                            if raw_tc.get("function", {}).get("name"):
-                                args_str = raw_tc["function"].get("arguments", "{}")
-                                try:
-                                    args = json_module.loads(args_str) if args_str else {}
-                                except json_module.JSONDecodeError:
-                                    args = {}
-                                complete_tool_calls.append(ToolCall(
-                                    id=raw_tc.get("id", ""),
-                                    name=raw_tc["function"]["name"],
-                                    arguments=args,
-                                ))
-
-                    if raw_tool_calls:
-                        assistant_msg = Message(
-                            role="assistant",
-                            content=response_text,
-                            tool_calls=raw_tool_calls,
-                        )
-                        messages.append(assistant_msg)
-
-                    if complete_tool_calls and len(complete_tool_calls) > 1:
-                        permission_checks = []
-                        for tool_call in complete_tool_calls:
-                            tool = self.registry.get(tool_call.name)
-                            if tool and tool.needs_permission and not self._yes_flag:
-                                try:
-                                    print(f"\n[Permission required for: {tool_call.name}]")
-                                    response = input(f"  Allow '{tool_call.name}'? (y/N): ").strip().lower()
-                                    if response not in ("y", "yes"):
-                                        permission_checks.append((tool_call, None))
-                                    else:
-                                        permission_checks.append((tool_call, tool))
-                                except (EOFError, KeyboardInterrupt):
-                                    print("  Skipped.")
-                                    permission_checks.append((tool_call, None))
-                            else:
-                                permission_checks.append((tool_call, tool))
-
-                        print(f"\n[Running {sum(1 for _, t in permission_checks if t is not None)} tools in parallel]")
-                        coroutines = []
-                        for tool_call, tool in permission_checks:
-                            if tool:
-                                coroutines.append(self._execute_single_tool(tool_call, tool))
-                            else:
-                                coroutines.append(asyncio.coroutine(lambda tc=tool_call: ToolResult(
-                                    success=False, content="", error=f"Permission denied for {tc.name}"
-                                ))())
-
-                        results = await asyncio.gather(*coroutines, return_exceptions=True)
-                        for (tool_call, tool), result in zip(permission_checks, results):
-                            if isinstance(result, Exception):
-                                result = ToolResult(success=False, content="", error=str(result))
-                            messages.append(
-                                Message(
-                                    role="tool",
-                                    content=result.content or "",
-                                    name=tool_call.name,
-                                    tool_call_id=tool_call.id,
-                                )
-                            )
-                            if tool_call.name not in self.session.tools_used:
-                                self.session.tools_used.append(tool_call.name)
-                            if result.success:
-                                prefix = f"{self.personality.success()} "
-                            else:
-                                prefix = f"{self.personality.failure()} "
-                            preview = result.content[:200] if result.content else result.error or ""
-                            print(
-                                f"{prefix}{tool_call.name}: {preview}..."
-                                if len(preview) > 200
-                                else f"{prefix}{tool_call.name}: {preview}"
-                            )
-                    elif complete_tool_calls:
-                        tool_call = complete_tool_calls[0]
-                        tool = self.registry.get(tool_call.name)
-                        if tool and tool.needs_permission and not self._yes_flag:
-                            try:
-                                cyan = "\033[36m"
-                                blue = "\033[34m"
-                                bold = "\033[1m"
-                                reset = "\033[0m"
-                                print(f"  {blue}╼{reset} {cyan}{tool_call.name}{reset} {bold}requires authorization{reset}")
-                                response = input(f"    {bold}Allow execution?{reset} (y/N): ").strip().lower()
-                                if response not in ("y", "yes"):
-                                    print(f"  Skipped: {tool_call.name}")
-                                    messages.append(
-                                        Message(
-                                            role="tool",
-                                            content=f"[SKIPPED] User denied permission for {tool_call.name}",
-                                            name=tool_call.name,
-                                            tool_call_id=tool_call.id,
-                                        )
-                                    )
-                                else:
-                                    result = await self._execute_single_tool(tool_call, tool)
-                                    messages.append(
-                                        Message(
-                                            role="tool",
-                                            content=result.content or "",
-                                            name=tool_call.name,
-                                            tool_call_id=tool_call.id,
-                                        )
-                                    )
-                                    if tool_call.name not in self.session.tools_used:
-                                        self.session.tools_used.append(tool_call.name)
-                            except (EOFError, KeyboardInterrupt):
-                                print("  Skipped.")
-                                messages.append(
-                                    Message(
-                                        role="tool",
-                                        content=f"[SKIPPED] User denied permission for {tool_call.name}",
-                                        name=tool_call.name,
-                                        tool_call_id=tool_call.id,
-                                    )
-                                )
-                        elif tool:
-                            result = await self._execute_single_tool(tool_call, tool)
-                            messages.append(
-                                Message(
-                                    role="tool",
-                                    content=result.content or "",
-                                    name=tool_call.name,
-                                    tool_call_id=tool_call.id,
-                                )
-                            )
-                            if tool_call.name not in self.session.tools_used:
-                                self.session.tools_used.append(tool_call.name)
-
-                    if not complete_tool_calls:
-                        final_content = response_text
-                        break
-
-                    print()
-
-            else:
-                response = await self.manager.complete(messages, tools)
-
-                # Handle tool calls
-                if response.tool_calls:
-                    # Add assistant message with tool calls before tool results
-                    messages.append(Message(
-                        role="assistant",
-                        content=response.content,
-                        tool_calls=response.raw_tool_calls,
-                    ))
-
-                    for tool_call in response.tool_calls:
-                        tool = self.registry.get(tool_call.name)
-                        if tool and tool.needs_permission and not self._yes_flag:
-                            try:
-                                cyan = "\033[36m"
-                                blue = "\033[34m"
-                                bold = "\033[1m"
-                                reset = "\033[0m"
-                                print(f"  {blue}╼{reset} {cyan}{tool_call.name}{reset} {bold}requires authorization{reset}")
-                                response = input(f"    {bold}Allow execution?{reset} (y/N): ").strip().lower()
-                                if response not in ("y", "yes"):
-                                    print(f"  Skipped: {tool_call.name}")
-                                    messages.append(
-                                        Message(
-                                            role="tool",
-                                            content=f"[SKIPPED] User denied permission for {tool_call.name}",
-                                            name=tool_call.name,
-                                            tool_call_id=tool_call.id,
-                                        )
-                                    )
-                                    continue
-                            except (EOFError, KeyboardInterrupt):
-                                print("  Skipped.")
-                                messages.append(
-                                    Message(
-                                        role="tool",
-                                        content=f"[SKIPPED] User denied permission for {tool_call.name}",
-                                        name=tool_call.name,
-                                        tool_call_id=tool_call.id,
-                                    )
-                                )
-                                continue
-                        if tool:
-                            proceed, error_result = self._check_tool_safety(
-                                tool_call.name, tool_call.arguments
-                            )
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                             if not proceed:
                                 result = error_result
                             else:
@@ -850,32 +385,32 @@ Focus on being helpful, accurate, and efficient.
                                         if path_key in tool_call.arguments:
                                             self.safety.mark_file_read(tool_call.arguments[path_key])
                                             break
-<<<<<<< HEAD
+                                
+                                # Visual Kinetic Write for file writes
+                                if tool_call.name == "write" or tool_call.name == "edit":
+                                    self._show_kinetic_stream(tool_call.arguments.get("path", "file"))
+                                
                                 result = await tool.execute(**tool_call.arguments)
+                                
+                                # THE REFINER'S FIRE: Post-Execution Validation
+                                if result.success and tool_call.name in ("write", "edit"):
+                                    validation_passed, validation_error = await self._run_refiners_fire(tool_call.arguments.get("path"))
+                                    if not validation_passed:
+                                        result.success = False
+                                        result.content = f"[REJECTED BY FIRE] The work was performed, but it failed the integrity check:\n{validation_error}\n\n[RECOVERY] I have detected an impurity in the logic. You must fix this error before proceeding."
+                                
+                                if not result.success:
+                                    result.content = await self._handle_tool_failure(
+                                        tool_call.name, tool_call.arguments, result.error or result.content
+                                    )
                             tool_results.append((tool_call, result))
                             if not result.success:
-=======
-                                if tool_call.name == "Write":
-                                    path_key = next((k for k in ("path", "filePath", "file_path") if k in tool_call.arguments), None)
-                                    if path_key:
-                                        path = tool_call.arguments[path_key]
-                                        from pathlib import Path
-                                        if Path(path).exists():
-                                            self._file_snapshots[path] = Path(path).read_text()
-                                ctx = {"session_id": self.session.id}
-                                modified_args = self.plugin_manager.call_tool_hooks(tool_call.name, tool_call.arguments, ctx)
-                                result = await tool.execute(**modified_args)
-                                result = self.plugin_manager.call_result_hooks(tool_call.name, result, ctx)
-                            if not result.success:
-                                self._last_failed_tool_call = tool_call
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                                 self.learning.record_failure(
                                     tool_name=tool_call.name,
                                     args=tool_call.arguments,
                                     error=result.error or result.content,
                                     context={"session": self.session.id},
                                 )
-<<<<<<< HEAD
                             self.thinking_engine.finish_step(
                                 exec_step,
                                 result=result.content[:200] if result.content else "",
@@ -900,8 +435,28 @@ Focus on being helpful, accurate, and efficient.
                                 self.session.tools_used.append(chunk.tool_call.name)
 
                 print()  # Newline after streaming
-                final_content = response_text
-                streaming_done = True
+
+                # If tools were called, send results back and get final response
+                if tool_results:
+                    for tc, res in tool_results:
+                        messages.append(Message(
+                            role="tool",
+                            content=res.content,
+                            name=tc.name,
+                            tool_call_id=tc.id,
+                        ))
+                    final_response = await self.manager.complete(messages, tools)
+                    final_content = final_response.content
+                    if print_result and final_content:
+                        cyan = "\033[36m"
+                        reset = "\033[0m"
+                        print(f"\n{cyan}◈{reset} {final_content}")
+                    streaming_done = True
+                    return final_content
+                else:
+                    final_content = response_text
+                    streaming_done = True
+                    return response_text
 
             else:
                 response = await self.manager.complete(messages, tools)
@@ -919,7 +474,16 @@ Focus on being helpful, accurate, and efficient.
                                     if path_key in tool_call.arguments:
                                         self.safety.mark_file_read(tool_call.arguments[path_key])
                                         break
+                            
+                            # Visual Kinetic Write
+                            if tool_call.name == "write" or tool_call.name == "edit":
+                                self._show_kinetic_stream(tool_call.arguments.get("path", "file"))
+                                
                             result = await tool.execute(**tool_call.arguments)
+                            if not result.success:
+                                result.content = await self._handle_tool_failure(
+                                    tool_call.name, tool_call.arguments, result.error or result.content
+                                )
                         if not result.success:
                             self.learning.record_failure(
                                 tool_name=tool_call.name,
@@ -927,6 +491,15 @@ Focus on being helpful, accurate, and efficient.
                                 error=result.error or result.content,
                                 context={"session": self.session.id},
                             )
+                        
+                        # Add assistant's tool_call message to history
+                        messages.append(Message(
+                            role="assistant",
+                            content=response.content,
+                            tool_calls=[tool_call]
+                        ))
+                        
+                        # Add tool result message
                         messages.append(Message(
                             role="tool",
                             content=result.content,
@@ -937,160 +510,192 @@ Focus on being helpful, accurate, and efficient.
                 # Get final response (may be after tool results)
                 response = await self.manager.complete(messages, tools)
                 final_content = response.content
-=======
-                            messages.append(
-                                Message(
-                                    role="tool",
-                                    content=result.content or "",
-                                    name=tool_call.name,
-                                    tool_call_id=tool_call.id,
-                                )
-                            )
-
-                    # Get final response (may be after tool results)
-                    response = await self.manager.complete(messages, tools)
-                    final_content = response.content
-                else:
-                    final_content = response.content
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+                if print_result and final_content:
+                    cyan = "\033[36m"
+                    reset = "\033[0m"
+                    print(f"\n{cyan}◈{reset} {final_content}")
                 streaming_done = False
+                return final_content
 
             if print_result and final_content and not streaming_done:
                 print(final_content)
 
             self.memory.save_session(self.session)
-<<<<<<< HEAD
-=======
-            self._manage_context_window()
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             return final_content
 
         except Exception as e:
             return f"Error: {e}"
 
-<<<<<<< HEAD
-=======
-    def _get_help_categories(self) -> dict[str, list[tuple[str, str]]]:
-        """Returns a categorized mapping of commands and their descriptions."""
-        return {
-            "Session": [
-                ("/exit", "Exit the REPL"),
-                ("/clear", "Clear conversation"),
-                ("/history", "Show message history"),
-                ("/save", "Save current session"),
-                ("/sessions", "List saved sessions"),
-                ("/load <id>", "Load a saved session"),
-                ("/session", "Show current session info"),
-            ],
-            "Team": [
-                ("/spawn <role>", "Spawn a team agent (coder, reviewer, tester, researcher)"),
-                ("/template <name>", "Load a pre-configured agent profile"),
-                ("/agents", "List active agents"),
-                ("/team", "Show team status"),
-            ],
-            "Cognition & Planning": [
-                ("/plan, /p", "Enter plan mode for a task"),
-                ("/build", "Execute approved plan steps"),
-                ("/think", "Show thinking engine state"),
-                ("/reflect", "Trigger reflection on current work"),
-            ],
-            "Configuration & Status": [
-                ("/model <name>", "Switch model"),
-                ("/providers", "Show configured providers"),
-                ("/models", "Show available models"),
-                ("/status", "Show system status"),
-                ("/doctor", "Run system diagnostics"),
-                ("/config", "Manage configuration"),
-            ],
-            "Learning & Safety": [
-                ("/learn stats", "Learning system / lessons / failures / clear"),
-                ("/improve queue", "Improvement queue / approve / reject / run"),
-                ("/safety status", "Safety rules / strict / permissive"),
-                ("/facts", "Show stored facts"),
-                ("/fact <text>", "Add a persistent fact"),
-            ],
-            "Extensions": [
-                ("/skills", "List available skills"),
-                ("/skill <name>", "Activate a skill"),
-                ("/plugin", "Plugin management"),
-                ("/mcp", "MCP server status"),
-            ],
-            "Interface": [
-                ("/stream", "Toggle streaming mode"),
-                ("/voice", "Enter voice mode (Nexus speaks & listens)"),
-                ("/phone", "Phone-optimized mode info"),
-                ("/partner", "Set personality mode"),
-                ("/update", "Update Nexus to the latest version"),
-            ],
+    def _get_proactive_insight(self) -> str | None:
+        """Fetch a proactive suggestion from the Shadow Architect."""
+        import random
+        insights_fact = self.memory.get_fact("proactive_insights")
+        if insights_fact and isinstance(insights_fact.value, list) and insights_fact.value:
+            return random.choice(insights_fact.value)
+        return None
+
+    def _show_tech_stack_loader(self, stack: str) -> None:
+        """Visual effect for tech stack initialization."""
+        cyan = "\033[36m"
+        green = "\033[32m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        bold = "\033[1m"
+        
+        icons = {
+            "python": "🐍 [PYTHON_ENV]",
+            "node": "🟢 [NODE_JS]",
+            "react": "⚛️  [REACT_APP]",
+            "git": "🌿 [GIT_REPO]",
+            "rust": "🦀 [RUST_CARGO]",
         }
+        
+        icon = icons.get(stack.lower(), f"◈ [{stack.upper()}]")
+        print(f"\n  {cyan}◈ INITIALIZING TECH STACK: {bold}{icon}{reset}")
+        
+        # Atmospheric loading bar
+        bar_width = 30
+        for i in range(bar_width + 1):
+            time.sleep(0.02)
+            pct = i / bar_width
+            filled = int(pct * 20)
+            bar = "▰" * filled + "▱" * (20 - filled)
+            sys.stdout.write(f"\r    {dim}syncing dependencies... {bar} {pct:.0%}{reset}")
+            sys.stdout.flush()
+        print(f"\n    {green}STABILIZED: {stack.upper()} ENVIRONMENT READY{reset}\n")
 
-    def _handle_help(self, args: str) -> None:
-        """Display the interactive command explorer."""
-        categories = self._get_help_categories()
+    def _show_context_pulse(self) -> None:
+        """Visual effect for context layer injection."""
+        import random
+        cyan = "\033[36m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        layers = ["IDENTITY", "SAFETY", "PROJECT", "MEMORY", "USER"]
+        print(f"  {dim}INITIALIZING NEURAL LAYERS: {reset}", end="", flush=True)
+        for layer in layers:
+            time.sleep(0.04)
+            sys.stdout.write(f"{cyan}◈{reset}")
+            sys.stdout.flush()
+        print(f" {dim}STABLE{reset}")
 
-        print("\n\033[1;36m-- NEXUS COMMAND EXPLORER --\033[0m")
-        print("\033[90mSearch: /help <keyword> | Quick Start: /plan, /template, /doctor\033[0m\n")
+    def _show_neural_branching(self, spawned_agents) -> None:
+        """Visual effect for auto-spawning agents."""
+        cyan = "\033[36m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        agent_names = [a.name for a in spawned_agents]
+        print(f"  {cyan}◈ NEURAL BRANCHING DETECTED{reset}")
+        for name in agent_names:
+            print(f"    {dim}╰ spawning specialist:{reset} {cyan}{name}{reset}")
 
-        if args:
-            # Filtered Mode
-            keyword = args.lower()
-            found = False
-            print(f"\033[1mSearching for '{keyword}':\033[0m")
-            for cat, cmds in categories.items():
-                matches = [c for c in cmds if keyword in c[0].lower() or keyword in c[1].lower()]
-                if matches:
-                    print(f"\n\033[94m{cat}\033[0m")
-                    for cmd, desc in matches:
-                        print(f"  \033[32m{cmd}\033[0m → {desc}")
-                    found = True
-            if not found:
-                print(f"\033[91mNo commands found matching '{keyword}'\033[0m")
-            return
+    def _show_kinetic_stream(self, path: str) -> None:
+        """Visual effect for data streaming into a file."""
+        import random
+        green = "\033[32m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        filename = os.path.basename(path)
+        print(f"  {dim}STREAMING DATA TO {reset}{green}{filename}{reset} {dim}...", end="", flush=True)
+        
+        # Kinetic particle stream
+        particles = ["·", "•", "◦", "◙", "▫"]
+        for _ in range(12):
+            p = random.choice(particles)
+            sys.stdout.write(f"{green}{p}{reset}")
+            sys.stdout.flush()
+            time.sleep(0.03)
+        print(f" {dim}SYNCED{reset}")
 
-        # Global Mode
-        for cat, cmds in categories.items():
-            print(f"\033[1;34m{cat}\033[0m")
-            for cmd, desc in cmds:
-                print(f"  \033[32m{cmd}\033[0m  {desc}")
-            print()
+    async def _run_refiners_fire(self, path: str | None) -> tuple[bool, str | None]:
+        """Perform a mandatory integrity check on modified code (The Refiner's Fire)."""
+        if not path or not os.path.exists(path):
+            return True, None
+            
+        red = "\033[31m"
+        green = "\033[32m"
+        reset = "\033[0m"
+        
+        # 1. Syntax Check (The first test of fire)
+        if path.endswith(".py"):
+            try:
+                import ast
+                with open(path, "r", encoding="utf-8") as f:
+                    ast.parse(f.read())
+            except SyntaxError as e:
+                return False, f"Syntax Error: {e.msg} (line {e.lineno})"
+            except Exception as e:
+                return False, str(e)
+        
+        # 1. Syntax Check (The first test of fire)
+        if path.endswith(".py"):
+            try:
+                import ast
+                with open(path, "r", encoding="utf-8") as f:
+                    ast.parse(f.read())
+            except SyntaxError as e:
+                return False, f"Syntax Error: {e.msg} (line {e.lineno})"
+            except Exception as e:
+                return False, str(e)
+        
+        elif path.endswith(".json"):
+            # 2. JSON Validation
+            try:
+                import json
+                with open(path, "r", encoding="utf-8") as f:
+                    json.load(f)
+            except Exception as e:
+                return False, f"Invalid JSON: {str(e)}"
 
-    async def _handle_update(self) -> None:
-        """Check for and apply updates from GitHub."""
-        import subprocess
+        elif path.endswith((".yaml", ".yml")):
+            # 3. YAML Validation
+            try:
+                import yaml
+                with open(path, "r", encoding="utf-8") as f:
+                    yaml.safe_load(f)
+            except Exception as e:
+                return False, f"Invalid YAML: {str(e)}"
 
-        print("\n\033[1;36mChecking for updates...\033[0m")
+        print(f" {green}STOOD THE FIRE{reset}")
+        return True, None
+        return True, None
 
-        try:
-            # 1. Fetch latest from origin
-            subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
+    async def _handle_tool_failure(self, tool_name: str, arguments: dict, error: str) -> str:
+        """Perform automatic diagnostics and recovery hints for tool failures."""
+        import os
+        hint = f"Error: {error}"
+        
+        # 1. Edit Tool Context Mismatch
+        if tool_name == "edit" and "context mismatch" in error.lower():
+            path = arguments.get("path")
+            old_string = arguments.get("old_string")
+            if path and os.path.exists(path):
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                
+                # Check if old_string exists without context
+                if old_string and old_string in content:
+                    lines = content.splitlines()
+                    for i, line in enumerate(lines):
+                        if old_string in line:
+                            context_block = "\n".join(lines[max(0, i-2):min(len(lines), i+3)])
+                            hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i+1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
+                            break
+                else:
+                    hint += f"\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
 
-            # 2. Compare local HEAD with origin/main
-            local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            remote_hash = subprocess.check_output(
-                ["git", "rev-parse", "origin/main"], text=True
-            ).strip()
+        # 2. Bash Tool Command Not Found
+        elif tool_name == "bash" and "not found" in error.lower():
+            hint += f"\n\n[RECOVERY HINT] The command was not found. If this is a new tool, you might need to install it via 'apt install' or 'pip install'. In Termux, try 'pkg install'."
 
-            if local_hash == remote_hash:
-                print("\033[92m[+] Nexus is already up to date.\033[0m")
-                return
+        # 3. File Not Found
+        elif "file not found" in error.lower() or "no such file" in error.lower():
+            hint += f"\n\n[RECOVERY HINT] Verify the path exists using 'list' or 'glob'. Paths should usually be relative to the project root."
 
-            print(f"New version found! Updating from {local_hash[:7]} to {remote_hash[:7]}...")
+        return hint
 
-            # 3. Surgical Pull
-            subprocess.run(["git", "pull", "origin", "main"], check=True, capture_output=True)
-
-            # 4. Dependency Refresh
-            print("\033[90mRefreshing dependencies...\033[0m")
-            subprocess.run(["pip", "install", "-e", "."], check=True, capture_output=True)
-
-            print("\n\033[1;32m[+] Update successful! Nexus has been upgraded.\033[0m")
-            print("\033[90mPlease restart the session to apply all changes.\033[0m")
-
-        except Exception as e:
-            print(f"\n\033[91m[-] Update failed: {e}\033[0m")
-            print("You can still use the current version, but check your network connection.")
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
     def _handle_command(self, line: str) -> bool:
         """Handle a slash command. Returns True if handled."""
         if not line.startswith("/"):
@@ -1106,7 +711,6 @@ Focus on being helpful, accurate, and efficient.
             return True
 
         elif cmd == "help" or cmd == "h":
-<<<<<<< HEAD
             print("""
 Available commands:
   /exit, /quit     Exit the REPL
@@ -1122,36 +726,54 @@ Available commands:
   /sessions        List saved sessions
   /load <id>       Load a saved session
   /voice           Enter voice mode (Nexus speaks & listens)
-  /voice tts=freetts stt=whisper  Configure voice providers
   /spawn <role>    Spawn a team agent (coder, reviewer, tester, researcher)
-  /agents          List active agents
-  /team            Show team status
   /plan, /p        Enter plan mode for a task
   /build           Execute approved plan steps
-  /think           Show thinking engine state
-  /skills          List available skills
-  /skill <name>    Activate a skill
-  /providers       Show configured providers
-  /models          Show available models
-  /context         Show conversation context
-  /stats           Show session statistics
-  /retry           Retry last user message
-  /status          Show system status
-  /mcp             MCP server status
-  /plugin          Plugin management
+  /safety <mode>   Set safety mode (user_review, read_only, strict, auto_git, sensitive, sandbox, unrestricted)
   /doctor          Run system diagnostics
-  /sync status     Sync status / push / pull / connect / disconnect
-  /learn stats     Learning system / lessons / failures / clear
-  /improve queue   Improvement queue / approve / reject / run
-  /safety status   Safety rules / strict / permissive
-  /phone           Phone-optimized mode info
-  /reflect         Trigger reflection on current work
-  /partner         Set personality mode
+  /sync status     Sync status / push / pull
+  /learn stats     Learning system stats
   /help            Show this help
 """)
-=======
-            self._handle_help(args)
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+            return True
+
+        elif cmd == "safety":
+            from ..safety import SafetyMode
+            if not args:
+                current = self.safety.get_mode().name
+                print(f"Current safety mode: \033[96m{current}\033[0m")
+                print("Available modes: user_review, read_only, strict, auto_git, sensitive, sandbox, unrestricted")
+                return True
+            
+            try:
+                mode_map = {m.name.lower(): m for m in SafetyMode}
+                mode_map.update({m.value.lower(): m for m in SafetyMode})
+                
+                if args.lower() in mode_map:
+                    new_mode = mode_map[args.lower()]
+                    self.safety.set_mode(new_mode)
+                    print(f"Safety mode updated to: \033[92m{new_mode.name}\033[0m")
+                else:
+                    print(f"Invalid mode: {args}")
+            except Exception as e:
+                print(f"Error updating safety mode: {e}")
+            return True
+
+        elif cmd == "reflect":
+            print(f"\n\033[36m◈ INITIATING SESSION REFLECTION\033[0m")
+            stats = self.learning.get_session_stats(self.session.id)
+            failures = stats.get("failures", [])
+            successes = stats.get("tool_usage", {})
+            
+            print(f"  \033[90mTotal Cycles:\033[0m {sum(successes.values())}")
+            print(f"  \033[90mAnomalies Detected:\033[0m {len(failures)}")
+            
+            if failures:
+                print(f"\n  \033[31mCritical Failure Nodes:\033[0m")
+                for f in failures[-3:]:
+                    print(f"    - {f['tool_name']}: {f['error'][:60]}...")
+            
+            print(f"\n\033[36m  ◈ LOGIC OPTIMIZATION: NOMINAL\033[0m\n")
             return True
 
         elif cmd == "clear":
@@ -1163,11 +785,7 @@ Available commands:
             for i, msg in enumerate(self.messages[-10:]):
                 role = msg.role.upper()
                 content = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
-<<<<<<< HEAD
                 print(f"{i+1}. [{role}] {content}")
-=======
-                print(f"{i + 1}. [{role}] {content}")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             return True
 
         elif cmd == "tools":
@@ -1192,13 +810,7 @@ Available commands:
             print(f"Session: {self.session.id}")
             print(f"Created: {self.session.created_at}")
             print(f"Messages: {len(self.session.messages)}")
-<<<<<<< HEAD
             print(f"Tools used: {', '.join(self.session.tools_used) if self.session.tools_used else 'none'}")
-=======
-            print(
-                f"Tools used: {', '.join(self.session.tools_used) if self.session.tools_used else 'none'}"
-            )
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             return True
 
         elif cmd == "voice":
@@ -1221,33 +833,11 @@ Available commands:
                     agent = self.team.spawn(role, task=task)
                     print(f"Spawned {agent.name} ({role.value})")
                 except ValueError:
-<<<<<<< HEAD
                     print(f"Invalid role: {role_name}. Valid: {', '.join(r.value for r in AgentRole)}")
-=======
-                    print(
-                        f"Invalid role: {role_name}. Valid: {', '.join(r.value for r in AgentRole)}"
-                    )
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             else:
                 print("Usage: /spawn <role> [task]")
             return True
 
-<<<<<<< HEAD
-=======
-        elif cmd == "template":
-            if args:
-                from ..config import load_config
-
-                cfg = load_config()
-                if self.team and self.team.spawn_template(args.strip(), cfg.config_dir):
-                    print(f"Template {args} loaded successfully.")
-                else:
-                    print(f"Template not found: {args}")
-            else:
-                print("Usage: /template <name>")
-            return True
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         elif cmd == "agents":
             print("Active agents:")
             for agent in self.team.list_agents():
@@ -1322,10 +912,6 @@ Available commands:
 
         elif cmd == "skills":
             from ..skills import SkillsManager
-<<<<<<< HEAD
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             sm = SkillsManager()
             sm.load_all()
             print("\nAvailable skills:")
@@ -1337,10 +923,6 @@ Available commands:
         elif cmd == "skill":
             if args:
                 from ..skills import SkillsManager
-<<<<<<< HEAD
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                 sm = SkillsManager()
                 sm.load_all()
                 if sm.activate(args):
@@ -1369,11 +951,7 @@ Available commands:
             return True
 
         elif cmd == "stats":
-<<<<<<< HEAD
             print(f"\nAgent Statistics:")
-=======
-            print("\nAgent Statistics:")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             print(f"  Turn count: {self.session.id[:8]}")
             print(f"  Messages: {len(self.messages)}")
             print(f"  Tool calls: {self._tool_call_count}")
@@ -1381,7 +959,6 @@ Available commands:
             return True
 
         elif cmd == "retry":
-<<<<<<< HEAD
             print("Retry: not yet implemented (last failed tool)")
             return True
 
@@ -1395,47 +972,6 @@ Available commands:
 
         elif cmd == "status":
             print(f"\nNEXUS v0.1.0")
-=======
-            if self._last_failed_tool_call:
-                tool = self.registry.get(self._last_failed_tool_call.name)
-                if tool:
-                    print(f"Retrying: {self._last_failed_tool_call.name}")
-                    asyncio.create_task(self._retry_tool(self._last_failed_tool_call, tool))
-                    return True
-            print("No failed tool to retry.")
-            return True
-
-        elif cmd == "undo":
-            if not self._file_snapshots:
-                print("No file changes to undo.")
-                return True
-            from pathlib import Path
-            undone = []
-            for path, original in list(self._file_snapshots.items()):
-                try:
-                    Path(path).write_text(original)
-                    undone.append(path)
-                    del self._file_snapshots[path]
-                except Exception as e:
-                    print(f"Failed to undo {path}: {e}")
-            print(f"Undone {len(undone)} file(s): {', '.join(undone)}")
-            return True
-
-        elif cmd == "diff":
-            import subprocess
-            try:
-                result = subprocess.run(["git", "diff", "--stat"], capture_output=True, text=True)
-                if result.returncode == 0:
-                    print(result.stdout or "No changes.")
-                else:
-                    print("Not a git repository or git not available.")
-            except FileNotFoundError:
-                print("Git not found.")
-            return True
-
-        elif cmd == "status":
-            print("\nNEXUS v0.1.0")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             print(f"  Status: {'● ONLINE' if self.running else '○ OFFLINE'}")
             print(f"  Model: {self.manager.active_provider}")
             print(f"  Session: {self.session.id[:16]}")
@@ -1470,29 +1006,17 @@ Available commands:
 
         elif cmd == "plugin":
             from ..plugins import get_plugin_manager
-<<<<<<< HEAD
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             pm = get_plugin_manager()
             parts = args.split(maxsplit=1) if args else []
             subcmd = parts[0] if parts else "list"
             subargs = parts[1] if len(parts) > 1 else ""
-<<<<<<< HEAD
             
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             if subcmd == "list":
                 plugins = pm.list_all()
                 if not plugins:
                     print("No plugins loaded.")
                 for p in plugins:
-<<<<<<< HEAD
                     status = "✓ enabled" if pm.is_enabled(p.metadata.name) else "✗ disabled"
-=======
-                    status = "[+] enabled" if pm.is_enabled(p.metadata.name) else "[-] disabled"
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                     error = f" [ERROR: {p.error}]" if p.error else ""
                     print(f"  {p.metadata.name} v{p.metadata.version} — {status}{error}")
             elif subcmd == "enable" and subargs:
@@ -1511,17 +1035,10 @@ Available commands:
 
         elif cmd == "doctor":
             print("\n[DIAGNOSTICS]")
-<<<<<<< HEAD
             print(f"  Config: /root/.nexus/config.json exists")
             print(f"  Providers: {len(self.manager.configs)} configured")
             print(f"  Tools: {len(self.registry.list_all())} available")
             print(f"  Termux: available")
-=======
-            print("  Config: /root/.nexus/config.json exists")
-            print(f"  Providers: {len(self.manager.configs)} configured")
-            print(f"  Tools: {len(self.registry.list_all())} available")
-            print("  Termux: available")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             print(f"  Plugins: {len(get_plugin_manager().list_all())} loaded")
             print(f"  Safety rules: {len(self.safety.rules)} loaded")
             print(f"  Learning lessons: {self.learning.get_stats()['total_lessons']}")
@@ -1540,7 +1057,6 @@ Available commands:
             elif sub == "push":
                 result = self.sync_engine.push(subargs or "default")
                 if result.get("success"):
-<<<<<<< HEAD
                     print(f"✓ Pushed {result.get('items', 0)} item(s)")
                     if result.get("gist_url"):
                         print(f"  Gist: {result['gist_url']}")
@@ -1551,30 +1067,11 @@ Available commands:
                 if result.get("success"):
                     print(f"✓ Pulled {result.get('items', 0)} item(s)")
                     if result.get("conflicts"):
-                        print(f"⚠ Conflicts: {', '.join(result['conflicts'])}")
+                        print(f"[!] Conflicts: {', '.join(result['conflicts'])}")
                 else:
                     print(f"✗ Pull failed: {result.get('error')}")
             elif sub == "connect":
                 print("Use: nexus sync connect <github-gist|local|git> --token <token> --path <path>")
-=======
-                    print(f"[+] Pushed {result.get('items', 0)} item(s)")
-                    if result.get("gist_url"):
-                        print(f"  Gist: {result['gist_url']}")
-                else:
-                    print(f"[-] Push failed: {result.get('error')}")
-            elif sub == "pull":
-                result = self.sync_engine.pull(subargs or "default")
-                if result.get("success"):
-                    print(f"[+] Pulled {result.get('items', 0)} item(s)")
-                    if result.get("conflicts"):
-                        print(f"[!] Conflicts: {', '.join(result['conflicts'])}")
-                else:
-                    print(f"[-] Pull failed: {result.get('error')}")
-            elif sub == "connect":
-                print(
-                    "Use: nexus sync connect <github-gist|local|git> --token <token> --path <path>"
-                )
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             elif sub == "disconnect":
                 if subargs and self.sync_engine.disconnect(subargs):
                     print(f"Disconnected: {subargs}")
@@ -1595,7 +1092,6 @@ Available commands:
                 lessons = self.learning._load_all_lessons()[:5]
                 if not lessons:
                     print("No lessons yet. Keep building!")
-<<<<<<< HEAD
                 for l in lessons:
                     rate = l.success_count / max(1, l.success_count + l.failure_count)
                     print(f"\n  [{l.lesson_id}] {l.title}")
@@ -1605,23 +1101,6 @@ Available commands:
                 import json
                 failures = sorted(self.learning.failures_dir.glob("*.json"),
                                  key=lambda f: f.stat().st_mtime, reverse=True)[:5]
-=======
-                for lesson in lessons:
-                    rate = lesson.success_count / max(1, lesson.success_count + lesson.failure_count)
-                    print(f"\n  [{lesson.lesson_id}] {lesson.title}")
-                    print(f"    {lesson.summary[:80]}...")
-                    print(
-                        f"    Success: {rate:.0%} | Triggers: {', '.join(lesson.trigger_conditions[:2])}"
-                    )
-            elif sub == "failures":
-                import json
-
-                failures = sorted(
-                    self.learning.failures_dir.glob("*.json"),
-                    key=lambda f: f.stat().st_mtime,
-                    reverse=True,
-                )[:5]
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                 for f in failures:
                     d = json.loads(f.read_text())
                     print(f"  [{d['timestamp'][:16]}] {d['tool_name']} — {d['error_type']}")
@@ -1639,17 +1118,12 @@ Available commands:
                 print(self.improver.format_improvement_queue())
             elif sub == "approve" and len(parts) > 1:
                 if self.improver.approve(parts[1]):
-<<<<<<< HEAD
                     print(f"✓ Approved: {parts[1]}. Use /improve apply {parts[1]} to apply.")
-=======
-                    print(f"[+] Approved: {parts[1]}. Use /improve apply {parts[1]} to apply.")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                 else:
                     print(f"Improvement not found: {parts[1]}")
             elif sub == "apply" and len(parts) > 1:
                 result = self.improver.apply(parts[1])
                 if result.get("success"):
-<<<<<<< HEAD
                     print(f"✓ Applied: {result.get('message')}")
                 else:
                     print(f"✗ Failed: {result.get('error')}")
@@ -1665,25 +1139,6 @@ Available commands:
                     print(f"✓ Generated {len(improvements)} improvement(s):")
                     for imp in improvements:
                         print(f"  • {imp.title}")
-=======
-                    print(f"[+] Applied: {result.get('message')}")
-                else:
-                    print(f"[-] Failed: {result.get('error')}")
-            elif sub == "run":
-                print("\n[improve] Running self-improvement loop...")
-                {"tasks_completed": len(self.session.messages) // 2, "failures": []}
-                improvements = self.improver.run_improvement_loop(
-                    [],  # failures list
-                    task_context=str(self.session.messages[-1]["content"])[:100]
-                    if self.session.messages
-                    else "",
-                    provider_manager=self.manager,
-                )
-                if improvements:
-                    print(f"[+] Generated {len(improvements)} improvement(s):")
-                    for imp in improvements:
-                        print(f"  * {imp.title}")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                 else:
                     print("  No improvements needed right now.")
             elif sub == "reject" and len(parts) > 1:
@@ -1711,11 +1166,7 @@ Available commands:
                 self.safety.disable_strict_mode()
                 print("Permissive mode — warnings are suggestions only")
             elif sub == "rules":
-<<<<<<< HEAD
                 for rid, rule in list(self.safety.rules.items())[:10]:
-=======
-                for _rid, rule in list(self.safety.rules.items())[:10]:
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
                     print(f"  [{rule.level.name}] {rule.name}: {rule.description[:50]}")
             else:
                 print("Usage: /safety status|strict|permissive|rules")
@@ -1746,19 +1197,11 @@ Available commands:
         """Run plan mode for the given task."""
         if not self._plan_mode:
             return
-<<<<<<< HEAD
         
         try:
             plan = await self._plan_mode.generate_plan(self.manager, self.messages)
             print(self._plan_mode.format_for_display())
             
-=======
-
-        try:
-            await self._plan_mode.generate_plan(self.manager, self.messages)
-            print(self._plan_mode.format_for_display())
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             # Wait for user input
             try:
                 action = input("Action (A=approve all, S=skip low, Q=quit): ").strip().lower()
@@ -1766,11 +1209,7 @@ Available commands:
                 print("Plan mode cancelled.")
                 self._plan_active = False
                 return
-<<<<<<< HEAD
             
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             if action == "a":
                 self._plan_mode.approve_all()
                 print("All steps approved. Use /build to execute.")
@@ -1789,26 +1228,15 @@ Available commands:
         """Execute the current plan."""
         if not self._plan_mode or not self._plan_mode.plan:
             return
-<<<<<<< HEAD
         
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         approved = self._plan_mode.get_approved_steps()
         if not approved:
             print("No approved steps to execute.")
             return
-<<<<<<< HEAD
         
         print(f"\nExecuting {len(approved)} approved steps...")
         tracker = ProgressTracker(len(approved), "Executing plan")
         
-=======
-
-        print(f"\nExecuting {len(approved)} approved steps...")
-        tracker = ProgressTracker(len(approved), "Executing plan")
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         for step in approved:
             tracker.step(step.description)
             if step.tool_name:
@@ -1819,17 +1247,16 @@ Available commands:
                         step.result = result.content[:100]
                     except Exception as e:
                         step.error = str(e)
-<<<<<<< HEAD
         
-=======
-
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
         tracker.finish()
         self._plan_active = False
 
+    def _get_prompt(self) -> str:
+        """Return the current REPL prompt."""
+        return "\n  nexus> "
+
     async def run(self) -> None:
         """Run the REPL."""
-<<<<<<< HEAD
         greeting = self.personality.greet()
         print(f"""
 ╔══════════════════════════════════════════════════════════╗
@@ -1860,119 +1287,8 @@ Available commands:
             except EOFError:
                 break
             except Exception as e:
-                self.learning.record_failure(str(e), {"type": type(e).__name__}, "")
+                self.learning.record_failure(str(e), {"type": type(e).__name__}, {"session": self.session.id})
                 print(f"{self.personality.failure()} {e}")
-=======
-        # Check first run status
-        from ..config import load_config, save_config
-
-        cfg = load_config()
-        if cfg.first_run:
-            from .welcome import display_welcome
-
-            display_welcome()
-            # Update first_run to False and save
-            cfg.first_run = False
-            save_config(cfg)
-
-        print(f"\n{self.personality.greet()} Type /help for commands.")
-
-        # Verify provider is working on startup
-        await self._ensure_provider()
-
-        # Auto-detect project
-        from nexus.sessions import ProjectContext
-        project = ProjectContext()
-        detected = project.detect_project()
-        if detected:
-            project.load()
-            cyan = "\033[36m"
-            blue = "\033[34m"
-            dim = "\033[90m"
-            reset = "\033[0m"
-            print(f"  {blue}╼{reset} {dim}nexus/{reset}{cyan}project{reset} {detected}")
-            context_summary = project.format_context()
-            if context_summary != "(no project context)":
-                print(f"    {dim}{context_summary}{reset}")
-
-        # Handle SIGINT (Ctrl+C) gracefully
-        import signal
-
-        def signal_handler(sig, frame):
-            cyan = "\033[36m"
-            blue = "\033[34m"
-            dim = "\033[90m"
-            reset = "\033[0m"
-            print(f"\n  {blue}╼{reset} {dim}nexus/{reset}{cyan}core{reset} {dim}interrupt signal received. returning to prompt...{reset}")
-            # We raise a KeyboardInterrupt to be caught by the inner loop
-            # Since we are in an async loop, we need a way to break the await
-            # The simplest way for a synchronous signal handler is to trigger
-            # a KeyboardInterrupt in the main thread.
-            raise KeyboardInterrupt
-
-        signal.signal(signal.SIGINT, signal_handler)
-
-        while self.running:
-            try:
-                try:
-                    line = input(self._get_prompt()).strip()
-
-                    if not line:
-                        continue
-
-                    # Handle slash commands
-                    if line.startswith("/tasks"):
-                        print(self.tasks.get_checklist())
-                        continue
-                    if self._handle_command(line):
-                        continue
-
-                    # Handle regular input
-                    await self._generate_response(line)
-                except Exception as e:
-                    # --- Global Error Boundary (Panic Handler) ---
-                    import datetime
-                    import traceback
-                    from pathlib import Path
-
-                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    panic_file = Path.home() / ".nexus" / f"panic_{timestamp}.log"
-                    panic_file.parent.mkdir(parents=True, exist_ok=True)
-
-                    with open(panic_file, "w") as f:
-                        f.write(f"Panic occurred at {timestamp}\n")
-                        f.write(f"Input: {line if 'line' in locals() else 'N/A'}\n")
-                        f.write("-" * 40 + "\n")
-                        f.write(traceback.format_exc())
-
-                    print("\n\033[41m\033[37m PANIC \033[0m")
-                    print(
-                        "\033[91mAn unexpected error occurred. The session was preserved, but the current operation failed.\033[0m"
-                    )
-                    print(f"\033[90mPanic report saved to: {panic_file}\033[0m")
-                    print(f"\n{self.personality.failure()} Recovering to prompt...\n")
-
-                    # Record failure in learning engine
-                    try:
-                        self.learning.record_failure(
-                            tool_name="REPL_CORE",
-                            args={"input": line if "line" in locals() else "N/A"},
-                            error=str(e),
-                            context={"session": self.session.id},
-                        )
-                    except Exception:
-                        pass
-
-                except KeyboardInterrupt:
-                    print("\n(Use /exit to quit)")
-                    continue
-                except EOFError:
-                    break
-            except Exception as e:
-                # This is the absolute last resort wrapper
-                print(f"\033[91mCritical System Failure: {e}\033[0m")
-                break
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
 
         self._save_history()
         self.memory.save_session(self.session)
@@ -1980,7 +1296,6 @@ Available commands:
         if summary.get("failures", 0) > 0:
             print(f"\n{self.personality.reflection_ask()}")
 
-<<<<<<< HEAD
 
     def _on_team_message(self, msg) -> None:
         """Handle incoming team messages."""
@@ -2005,32 +1320,6 @@ Available commands:
         if event_type == "start":
             if step.state == ThinkingState.ANALYZING:
                 self._show_loading("Analyzing task...")
-=======
-    def _on_team_message(self, msg) -> None:
-        """Handle incoming team messages with sci-fi styling."""
-        cyan = "\033[36m"
-        blue = "\033[34m"
-        bold = "\033[1m"
-        dim = "\033[90m"
-        reset = "\033[0m"
-        
-        if msg.msg_type == "system":
-            # Strip the [spawn], [done], [fail] brackets from the content
-            content = msg.content.replace("[spawn]", f"{blue}⫸{reset}").replace("[done]", f"{blue}✔{reset}").replace("[fail]", f"{blue}✘{reset}")
-            print(f"\n  {blue}╼{reset} {dim}nexus/{reset}{cyan}team{reset} {content}")
-        else:
-            print(f"\n  {blue}╼{reset} {dim}nexus/{reset}{cyan}{msg.agent_name.lower()}{reset} {bold}»{reset} {msg.content}")
-            if msg.msg_type == "message":
-                self.messages.append(Message(role="assistant", content=f"[{msg.agent_name}]: {msg.content}"))
-
-    def _on_thinking_update(self, event) -> None:
-        """Handle thinking engine updates with atmospheric UI."""
-        event_type, step = event
-
-        if event_type == "start":
-            if step.state == ThinkingState.ANALYZING:
-                self._show_loading("nexus/thinking")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
             elif step.state == ThinkingState.PLANNING:
                 pass  # Planning is internal
             elif step.state == ThinkingState.EXECUTING:
@@ -2048,11 +1337,18 @@ Available commands:
                 self._show_task_complete(step)
 
     def _show_loading(self, message: str) -> None:
-        """Show dynamic loading indicator."""
+        """Show a 'Synaptic Pulse' loading indicator."""
         if not self._first_token_received:
+            import random
             cyan = "\033[36m"
+            dim = "\033[90m"
             reset = "\033[0m"
-            sys.stdout.write(f"\r{cyan}◈{reset} {message}...")
+            
+            # Atmospheric synaptic pulse symbols
+            pulses = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+            symbol = pulses[int(time.time() * 10) % len(pulses)]
+            
+            sys.stdout.write(f"\r  {cyan}{symbol}{reset} {dim}{message.upper()}{reset}")
             sys.stdout.flush()
 
     def _hide_loading(self) -> None:
@@ -2079,40 +1375,175 @@ Available commands:
         green = "\033[32m"
         red = "\033[31m"
         dim = "\033[90m"
+        cyan = "\033[36m"
         reset = "\033[0m"
 
         if step.state == ThinkingState.ERROR:
-            print(f"  {red}╰ Error:{reset} {step.detail or 'Execution failed'}")
+            # Glitch Alert Effect
+            red = "\033[31m"
+            dim = "\033[90m"
+            reset = "\033[0m"
+            glitch = "⚠ SYSTEM_ANOMALY ⚠"
+            print(f"  {red}{glitch}{reset}")
+            print(f"  {dim}╰ Failure Node:{reset} {step.detail or 'Execution failed'}")
         else:
             duration = f"{dim}[{step.duration_ms:.0f}ms]{reset}" if step.duration_ms else ""
-            print(f"  {green}╰ Result{reset} {duration}")
-
-            if step.tool_result:
+            
+            # Special Box for Shell/Git commands
+            if step.tool_name in ("bash", "git"):
+                self._draw_shell_box(step.tool_name, step.tool_result, term_width)
+            
+            # Diff Box for Edits
+            elif step.tool_name == "edit" and "applied successfully" in step.tool_result.lower():
+                self._draw_diff_box(step.tool_args, term_width)
+            
+            # Data Harvest effect for Web tools
+            elif step.tool_name in ("web_fetch", "web_search", "codesearch"):
+                cyan = "\033[36m"
+                print(f"  {cyan}╰ DATA HARVEST COMPLETE{reset} {duration}")
+                if step.tool_result:
+                    self._draw_harvest_grid(step.tool_result, term_width)
+            
+            # Scrubbing effect for Read
+            elif step.tool_name == "read" and step.tool_result:
+                cyan = "\033[36m"
+                dim = "\033[90m"
+                print(f"  {cyan}╰ FILE_SCRUB COMPLETE{reset} {duration}")
                 content = step.tool_result.strip()
-                max_chars = 300 if term_width < 60 else 500
+                lines = content.split("\n")
+                print(f"    {dim}processed {len(lines)} lines from segment{reset}")
+                # Show first 2 lines
+                for line in lines[:2]:
+                    print(f"    {dim}│{reset} {line[:term_width-10]}")
+                if len(lines) > 2:
+                    print(f"    {dim}╰ ... (+{len(lines)-2} more lines){reset}")
 
-                indent = "    "
-                if len(content) > max_chars:
-                    lines = content.split("\n")
-                    shown = f"\n{indent}".join(lines[:5])
-                    print(f"{indent}{shown}\n{indent}{dim}... (+{len(content) - len(shown)} chars){reset}")
-                else:
-                    indented_content = content.replace("\n", f"\n{indent}")
-                    print(f"{indent}{indented_content}")
+            else:
+                print(f"  {green}╰ Result{reset} {duration}")
+                if step.tool_result:
+                    content = step.tool_result.strip()
+                    max_chars = 300 if term_width < 60 else 500
+                    indent = "    "
+                    if len(content) > max_chars:
+                        lines = content.split("\n")
+                        shown = f"\n{indent}".join(lines[:5])
+                        print(f"{indent}{shown}\n{indent}{dim}... (+{len(content) - len(shown)} chars){reset}")
+                    else:
+                        indented_content = content.replace("\n", f"\n{indent}")
+                        print(f"{indent}{indented_content}")
+
+    def _draw_shell_box(self, tool_name: str, content: str, term_width: int) -> None:
+        """Draw a dedicated sci-fi console box for shell output."""
+        if not content:
+            return
+
+        cyan = "\033[36m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        # Determine box width (capped at 100 or term_width - 4)
+        box_width = min(100, term_width - 8)
+        header = f" {tool_name.upper()} CONSOLE "
+        padding = (box_width - len(header)) // 2
+        
+        top_border = f"  {cyan}╔" + "═" * padding + header + "═" * (box_width - padding - len(header)) + "╗" + reset
+        bottom_border = f"  {cyan}╚" + "═" * box_width + "╝" + reset
+        
+        print(top_border)
+        
+        lines = content.strip().split("\n")
+        max_lines = 15 # Don't overwhelm the screen
+        
+        for i, line in enumerate(lines):
+            if i >= max_lines:
+                print(f"  {cyan}║{reset}  {dim}... (+{len(lines) - max_lines} more lines){reset}" + " " * (box_width - 25) + f"{cyan}║{reset}")
+                break
+            
+            # Truncate line if it's too long for the box
+            display_line = line[:box_width-4]
+            # Pad the line to keep the right border aligned
+            padding_needed = box_width - len(display_line) - 2
+            print(f"  {cyan}║{reset}  {display_line}" + " " * padding_needed + f"{cyan}║{reset}")
+            
+        print(bottom_border)
+
+    def _draw_diff_box(self, tool_args: dict, term_width: int) -> None:
+        """Draw a visual diff of the changes made."""
+        path = tool_args.get("path", "file")
+        old_text = tool_args.get("old_string", "")
+        new_text = tool_args.get("new_string", "")
+        
+        green = "\033[32m"
+        red = "\033[31m"
+        cyan = "\033[36m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        box_width = min(100, term_width - 8)
+        print(f"  {cyan}╔" + "═" * ((box_width - 12) // 2) + " DIFF SOURCE " + "═" * (box_width - ((box_width - 12) // 2) - 13) + "╗")
+        print(f"  {cyan}║{reset} {dim}File: {path}{reset}" + " " * (box_width - len(path) - 8) + f"{cyan}║")
+        print(f"  {cyan}╠" + "═" * box_width + "╣")
+        
+        # Show what was removed (Red)
+        for line in old_text.splitlines():
+            display_line = line[:box_width-6]
+            padding = box_width - len(display_line) - 4
+            print(f"  {cyan}║{reset} {red}-{reset} {display_line}" + " " * padding + f"{cyan}║")
+            
+        # Show what was added (Green)
+        for line in new_text.splitlines():
+            display_line = line[:box_width-6]
+            padding = box_width - len(display_line) - 4
+            print(f"  {cyan}║{reset} {green}+{reset} {display_line}" + " " * padding + f"{cyan}║")
+            
+        print(f"  {cyan}╚" + "═" * box_width + "╝" + reset)
+
+    def _draw_harvest_grid(self, content: str, term_width: int) -> None:
+        """Draw a 'Data Harvest' grid for web results."""
+        cyan = "\033[36m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        indent = "    "
+        print(f"{indent}{dim}┌─ SHARED DATA STREAM ────────────────┐{reset}")
+        
+        # Take a snippet and format it as a grid
+        text = content[:400].replace("\n", " ")
+        words = text.split()
+        
+        current_line = f"{indent}{dim}│{reset} "
+        line_len = 0
+        max_width = min(60, term_width - 15)
+        
+        for word in words:
+            if line_len + len(word) > max_width:
+                print(current_line + " " * (max_width - line_len + 1) + f"{dim}│{reset}")
+                current_line = f"{indent}{dim}│{reset} "
+                line_len = 0
+            
+            current_line += word + " "
+            line_len += len(word) + 1
+            
+        if line_len > 0:
+            print(current_line + " " * (max_width - line_len + 1) + f"{dim}│{reset}")
+            
+        print(f"{indent}{dim}└─────────────────────────────────────┘{reset}")
 
     def _show_complete(self, step) -> None:
         """Show step complete."""
         self._tool_call_count += 1
 
     def _show_task_complete(self, step) -> None:
-        """Show task complete summary."""
+        """Show task complete summary with Neural Activity styling."""
         elapsed = step.duration_ms / 1000.0 if step.duration_ms else 0
-<<<<<<< HEAD
         tool_count = self._tool_call_count
-        print(f"\n\033[92m✅ Done in {elapsed:.1f}s\033[0m — {tool_count} tool call(s)")
-=======
-        print(f"\n[done] {elapsed:.1f}s, {self._tool_call_count} tool(s)")
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)
+        
+        cyan = "\033[36m"
+        dim = "\033[90m"
+        reset = "\033[0m"
+        
+        print(f"\n  {cyan}◈ NEURAL ACTIVITY STABILIZED{reset}")
+        print(f"    {dim}latency: {elapsed:.2f}s | cycles: {tool_count} | status: nominal{reset}\n")
 
     async def run_single(self, task: str) -> tuple[str, bool]:
         """Run a single task and return (result, was_streamed)."""
@@ -2133,8 +1564,5 @@ async def run_task(task: str, config: dict[str, Any] | None = None) -> tuple[str
     result, streamed = await repl.run_single(task)
     await repl.manager.close_all()
     return result, streamed
-<<<<<<< HEAD
 
 
-=======
->>>>>>> 8b77f00 (feat: implement dynamic ReAct loop and enhance CLI/TUI)

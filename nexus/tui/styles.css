@@ -1,297 +1,129 @@
-/* Nexus TUI Styles - Dark theme matching dashboard aesthetic */
+/* Nexus OS v3 - Touch-Optimized & Polished */
 
-Screen {
-    background: #010409;
+$bg-dark: #05070a;
+$bg-elevated: #0d1117;
+$bg-active: #161b22;
+$cyan: #00f2ff;
+$purple: #7c3aed;
+$blue: #3b82f6;
+$green: #10b981;
+$red: #f87171;
+$text-primary: #e6edf3;
+$text-dim: #7d8590;
+$border: #30363d;
+$border-active: #484f58;
+
+* {
+    background: $bg-dark;
+    color: $text-primary;
+    scrollbar-color: $cyan;
 }
 
-#app-container {
-    layout: grid;
-    grid-size: 2 4;
-    grid-columns: 3fr 2fr;
-    grid-rows: 1fr 1fr 1fr 60;
+Screen {
+    background: $bg-dark;
+    layers: base overlay;
 }
 
 #chat-panel {
-    column-span: 1;
-    row-span: 4;
-    background: #0d1117;
-    border: solid #30363d;
-    border-top: solid #30363d;
-    border-left: solid #30363d;
-    border-right: none;
-    border-bottom: none;
-    padding: 1;
+    height: 1fr;
+    border: none;
+    padding: 0 1;
 }
 
-#thinking-panel {
-    column-span: 1;
-    row-span: 1;
-    background: #0d1117;
-    border: solid #30363d;
-    border-top: solid #30363d;
-    border-right: solid #30363d;
-    border-bottom: none;
-    border-left: none;
-    padding: 1;
+#thinking-panel, #tool-panel, #agents-panel {
+    height: auto;
+    max-height: 15;
+    border-top: tall $border;
+    background: $bg-dark;
+    padding: 0 1;
 }
 
-#tool-panel {
-    column-span: 1;
-    row-span: 1;
-    background: #0d1117;
-    border: solid #30363d;
-    border-top: solid #30363d;
-    border-right: solid #30363d;
-    border-bottom: none;
-    border-left: none;
-    padding: 1;
+.neural-node {
+    /* Subtle glow for the active panel */
+    border-top: tall $border;
 }
 
-#agents-panel {
-    column-span: 1;
-    row-span: 1;
-    background: #0d1117;
-    border: solid #30363d;
-    border-top: solid #30363d;
-    border-right: solid #30363d;
-    border-bottom: solid #30363d;
-    border-left: none;
-    padding: 1;
-}
-
-#input-bar {
-    column-span: 2;
-    background: #161b22;
-    border: solid #30363d;
-    border-top: solid #238636;
-    dock: bottom;
-    height: 60;
-    padding: 1 2;
-}
-
-#status-bar {
-    dock: bottom;
-    height: 3;
-    background: #161b22;
-    color: #8b949e;
+.neural-node:focus {
+    border-top: tall $cyan;
 }
 
 .panel-header {
+    background: transparent;
+    color: $cyan;
     text-style: bold;
-    color: #c9d1d9;
-    background: #161b22;
+    padding: 1 1;
+    height: 3; /* Increased touch target */
+    content-align: left middle;
+}
+
+#input-bar {
+    background: $bg-elevated;
+    border-top: tall $cyan;
+    height: 5; /* Substantial touch target for mobile */
+    padding: 1 2;
+    dock: bottom;
+}
+
+.prompt {
+    color: $cyan;
+    text-style: bold;
+    padding: 1 1;
+    width: 7;
+}
+
+.input-field {
+    border: none;
+    background: $bg-active;
+    color: #ffffff;
+    width: 1fr;
     padding: 0 1;
 }
 
+#status-bar {
+    background: $bg-dark;
+    color: $text-dim;
+    height: 1;
+    dock: bottom;
+    padding: 0 2;
+    border-top: solid $border;
+}
+
+/* Chat Message Styling */
 .message-row {
+    padding: 1 0;
+    margin: 0 1;
     height: auto;
-    layout: horizontal;
-    padding: 0 1;
 }
 
-.message-row .timestamp {
-    color: #6e7681;
-    width: 6;
-}
-
-.message-row .role {
-    color: #8b949e;
+.timestamp {
+    color: $text-dim;
     width: 10;
 }
 
-.message-row .content {
-    color: #c9d1d9;
-    width: 100%;
-}
-
-#messages-container {
-    layout: vertical;
-    scrollbar-size: 1 1;
-}
-
-#messages-container > ChatMessageWidget {
-    height: auto;
-    margin: 0 0 1 0;
-}
-
-#thinking-container {
-    layout: vertical;
-    scrollbar-size: 1 1;
-}
-
-.thinking-block {
-    height: auto;
-    padding: 0 1;
-    margin: 0 0 1 0;
-}
-
-.step-number {
-    color: #58a6ff;
-    width: 4;
-}
-
-.step-description {
-    color: #c9d1d9;
-}
-
-#tools-container {
-    layout: vertical;
-    scrollbar-size: 1 1;
-}
-
-.tool-status {
-    color: #c9d1d9;
-    height: 1;
-    padding: 0 1;
-}
-
-#agents-container {
-    layout: vertical;
-    scrollbar-size: 1 1;
-}
-
-.agent-card {
-    color: #c9d1d9;
-    height: 1;
-    padding: 0 1;
-}
-
-.input-bar {
-    background: #161b22;
-}
-
-.input-bar .prompt {
-    color: #238636;
-    width: 8;
+.role {
+    width: 10;
     text-style: bold;
 }
 
-.input-bar #command-input {
-    background: #0d1117;
-    color: #c9d1d9;
-    border: solid #30363d;
+.content {
+    width: 1fr;
+    padding-left: 1;
 }
 
-.input-bar #command-input:focus {
-    border: solid #238636;
+/* Specific Widget Polish */
+AgentCard, ToolStatusWidget, ThinkingBlock {
+    padding: 1 2;
+    margin: 0 1;
+    background: $bg-elevated;
+    border-radius: 1;
+    height: 3; /* Touch targets */
 }
 
-.status-bar {
-    color: #8b949e;
-    background: #161b22;
+AgentCard:hover, ToolStatusWidget:hover, ThinkingBlock:hover {
+    background: $bg-active;
 }
 
-/* Tool status colors */
-.tool-pending {
-    color: #8b949e;
+.hidden {
+    display: none;
 }
 
-.tool-running {
-    color: #58a6ff;
-}
-
-.tool-done {
-    color: #3fb950;
-}
-
-.tool-error {
-    color: #f85149;
-}
-
-/* Agent status colors */
-.agent-idle {
-    color: #8b949e;
-}
-
-.agent-thinking {
-    color: #58a6ff;
-}
-
-.agent-tool-use {
-    color: #d29922;
-}
-
-.agent-waiting {
-    color: #8b949e;
-}
-
-.agent-error {
-    color: #f85149;
-}
-
-/* Message role colors */
-.message-user {
-    color: #79c0ff;
-}
-
-.message-assistant {
-    color: #d2a8ff;
-}
-
-.message-system {
-    color: #8b949e;
-}
-
-.message-tool {
-    color: #ffa657;
-}
-
-/* Scrollbar styling */
-ScrollBar {
-    background: #21262d;
-}
-
-ScrollBar > Slider {
-    background: #484f58;
-}
-
-/* Focus styles */
-:focus {
-    border: solid #238636;
-}
-
-/* Selection */
-::selection {
-    background: #1f6feb;
-    color: #f0f6fc;
-}
-
-/* Loading spinner */
-.loading-spinner {
-    color: #58a6ff;
-}
-
-/* Progress bar */
-.progress-bar {
-    color: #3fb950;
-}
-
-/* Error text */
-.error-text {
-    color: #f85149;
-}
-
-/* Warning text */
-.warning-text {
-    color: #d29922;
-}
-
-/* Info text */
-.info-text {
-    color: #58a6ff;
-}
-
-/* Success text */
-.success-text {
-    color: #3fb950;
-}
-
-/* Dim text */
-.dim-text {
-    color: #8b949e;
-}
-
-/* Bright text */
-.bright-text {
-    color: #f0f6fc;
-}

@@ -144,14 +144,29 @@ class Memory:
                 sessions.append(Session.from_dict(json.load(f)))
         return sessions
 
-    def add_fact(self, key: str, value: Any, category: str = "general", confidence: float = 1.0) -> None:
-        """Add a fact to memory."""
-        self._facts[key] = Fact(key=key, value=value, category=category, confidence=confidence)
-        self._save_facts()
+    def add_fact(self, key: str, value: Any, category: str = "general", confidence: float = 1.0, project_id: str | None = None) -> None:
+        """Add a fact to memory, optionally scoped to a project."""
+        if project_id:
+            project_context = self.load_project_context(project_id) or {}
+            facts = project_context.get("facts", {})
+            facts[key] = Fact(key=key, value=value, category=category, confidence=confidence, source=f"project:{project_id}").to_dict()
+            project_context["facts"] = facts
+            self.save_project_context(project_id, project_context)
+        else:
+            self._facts[key] = Fact(key=key, value=value, category=category, confidence=confidence)
+            self._save_facts()
 
-    def get_fact(self, key: str) -> Any | None:
-        """Get a fact from memory."""
-        return self._facts.get(key)
+    def get_fact(self, key: str, project_id: str | None = None) -> Any | None:
+        """Get a fact from memory, checking project scope first."""
+        if project_id:
+            project_context = self.load_project_context(project_id)
+            if project_context and "facts" in project_context:
+                fact_data = project_context["facts"].get(key)
+                if fact_data:
+                    return fact_data.get("value")
+        
+        fact = self._facts.get(key)
+        return fact.value if fact else None
 
     def get_facts_by_category(self, category: str) -> list[Fact]:
         """Get all facts in a category."""
@@ -189,7 +204,7 @@ class Memory:
                 return json.load(f)
         return None
 
-    def get_context_summary(self) -> str:
+    def get_context_summary(self, project_id: str | None = None) -> str:
         """Get a summary of all stored context for injection into prompts."""
         parts = []
 
@@ -197,6 +212,13 @@ class Memory:
             parts.append("## User Facts\n")
             for key, fact in sorted(self._facts.items()):
                 parts.append(f"- {key}: {fact.value}")
+
+        if project_id:
+            project_context = self.load_project_context(project_id)
+            if project_context and "facts" in project_context:
+                parts.append(f"\n## Project Facts ({project_id})\n")
+                for key, fact_data in sorted(project_context["facts"].items()):
+                    parts.append(f"- {key}: {fact_data.get('value')}")
 
         recent_sessions = self.list_sessions(limit=5)
         if recent_sessions:
@@ -264,12 +286,16 @@ class ProjectIndexer:
                     continue
 
                 file_path = os.path.join(dirpath, filename)
-                file_info = {
-                    "path": os.path.relpath(file_path, root),
-                    "type": ext.lstrip("."),
-                    "size": os.path.getsize(file_path),
-                }
-                project_info["files"].append(file_info)
+                try:
+                    if not os.path.exists(file_path): continue
+                    file_info = {
+                        "path": os.path.relpath(file_path, root),
+                        "type": ext.lstrip("."),
+                        "size": os.path.getsize(file_path),
+                    }
+                    project_info["files"].append(file_info)
+                except (OSError, FileNotFoundError):
+                    continue # Skip inaccessible files
 
                 if ext == ".py":
                     if project_info["language"] is None:

@@ -23,39 +23,40 @@ from .state import (
 )
 
 
-class ChatMessageWidget(Static):
-    """Displays a single chat message."""
+class ChatMessageWidget(Container):
+    """Displays a single chat message with atmospheric styling."""
 
     def __init__(self, message: ChatMessage, **kwargs):
         super().__init__(**kwargs)
         self.message = message
 
     def compose(self) -> ComposeResult:
-        role_str = self.message.role.name.lower()
-        timestamp = self.message.timestamp.strftime("%H:%M")
+        timestamp = self.message.timestamp.strftime("%H:%M:%S")
 
         if self.message.role == MessageRole.USER:
-            color = CSS_COLORS["user_message"]
+            role_display = f"[bold cyan]USER[/]"
+            prefix = "╼"
         elif self.message.role == MessageRole.ASSISTANT:
-            color = CSS_COLORS["assistant_message"]
+            role_display = f"[bold purple]NEXUS[/]"
+            prefix = "╾"
         elif self.message.role == MessageRole.SYSTEM:
-            color = CSS_COLORS["system_message"]
+            role_display = f"[dim]SYST[/]"
+            prefix = "•"
         else:
-            color = CSS_COLORS["tool_call"]
-
-        content = self._format_content()
+            role_display = f"[bold blue]TOOL[/]"
+            prefix = "⚙"
 
         yield Horizontal(
-            Static(f"[{timestamp}]", classes="timestamp"),
-            Static(f"[{role_str}]", markup=True, classes="role"),
-            Static(content, classes="content", markup=True),
+            Static(f"[dim]{timestamp}[/] {prefix} ", classes="timestamp"),
+            Static(role_display, classes="role"),
+            Static(self._format_content(), classes="content", markup=True),
             classes="message-row",
         )
 
     def _format_content(self) -> str:
         content = self.message.content
         if self.message.tool_name:
-            content = f"[tool: {self.message.tool_name}]{content}"
+            content = f"[tool: {self.message.tool_name}] {content}"
         if self.message.tool_calls:
             for tc in self.message.tool_calls:
                 content += f"\n[tool call: {tc.get('name', 'unknown')}]"
@@ -96,19 +97,17 @@ class ThinkingBlock(Container):
         self.step = step
 
     def compose(self) -> ComposeResult:
-        with Horizontal():
-            yield Static(f"#{self.step.step_number}", classes="step-number")
-            yield Static(self.step.description, classes="step-description")
-
-    def render(self) -> str:
-        icon = "[-]" if self.expanded else "[+]"
-        lines = [f"{icon} {self.step.description}"]
+        icon = "▼" if self.expanded else "▶"
+        yield Horizontal(
+            Static(f"[bold cyan]{icon}[/] [dim]#{self.step.step_number}[/]", classes="step-number"),
+            Static(self.step.description, classes="step-description"),
+        )
         if self.expanded and self.step.details:
-            lines.append(f"    {self.step.details}")
-        return "\n".join(lines)
+            yield Static(f"   [dim]{self.step.details}[/]", classes="step-details")
 
     def on_click(self) -> None:
         self.expanded = not self.expanded
+        self.refresh()
 
 
 class ThinkingPanel(Vertical):
@@ -141,28 +140,16 @@ class ToolStatusWidget(Static):
         super().__init__(**kwargs)
         self.tool = tool
 
-    def compose(self) -> ComposeResult:
+    def render(self) -> str:
         status_icon = {
-            ToolStatus.PENDING: "[ ]",
-            ToolStatus.RUNNING: "[...]",
-            ToolStatus.DONE: "[✓]",
-            ToolStatus.ERROR: "[✗]",
+            ToolStatus.PENDING: "[dim]○[/]",
+            ToolStatus.RUNNING: "[bold cyan]◎[/]",
+            ToolStatus.DONE: "[bold green]●[/]",
+            ToolStatus.ERROR: "[bold red]✗[/]",
         }.get(self.tool.status, "[?]")
 
-        color = {
-            ToolStatus.PENDING: CSS_COLORS["text_dim"],
-            ToolStatus.RUNNING: CSS_COLORS["info"],
-            ToolStatus.DONE: CSS_COLORS["success"],
-            ToolStatus.ERROR: CSS_COLORS["error"],
-        }.get(self.tool.status, CSS_COLORS["text"])
-
-        duration_str = f" ({self.tool.duration_ms}ms)" if self.tool.duration_ms else ""
-
-        yield Static(
-            f"{status_icon} {self.tool.name}{duration_str}",
-            markup=True,
-            classes="tool-status",
-        )
+        duration_str = f" [dim]{self.tool.duration_ms}ms[/]" if self.tool.duration_ms else ""
+        return f"{status_icon} {self.tool.name}{duration_str}"
 
 
 class ToolPanel(Vertical):
@@ -201,30 +188,17 @@ class AgentCard(Static):
         super().__init__(**kwargs)
         self.agent = agent
 
-    def compose(self) -> ComposeResult:
+    def render(self) -> str:
         status_icon = {
-            AgentStatus.IDLE: "●",
-            AgentStatus.THINKING: "◐",
-            AgentStatus.TOOL_USE: "◎",
-            AgentStatus.WAITING: "○",
-            AgentStatus.ERROR: "✗",
+            AgentStatus.IDLE: "[dim]💤[/]",
+            AgentStatus.THINKING: "[bold cyan]🧠[/]",
+            AgentStatus.TOOL_USE: "[bold yellow]🛠️[/]",
+            AgentStatus.WAITING: "[dim]⏳[/]",
+            AgentStatus.ERROR: "[bold red]⚠️[/]",
         }.get(self.agent.status, "?")
 
-        color = {
-            AgentStatus.IDLE: CSS_COLORS["text_dim"],
-            AgentStatus.THINKING: CSS_COLORS["info"],
-            AgentStatus.TOOL_USE: CSS_COLORS["warning"],
-            AgentStatus.WAITING: CSS_COLORS["text_dim"],
-            AgentStatus.ERROR: CSS_COLORS["error"],
-        }.get(self.agent.status, CSS_COLORS["text"])
-
-        model_str = f" ({self.agent.model})" if self.agent.model else ""
-
-        yield Static(
-            f"{status_icon} {self.agent.name}{model_str}",
-            markup=True,
-            classes="agent-card",
-        )
+        model_str = f" [dim]({self.agent.model})[/]" if self.agent.model else ""
+        return f"{status_icon} {self.agent.name}{model_str}"
 
 
 class AgentsPanel(Vertical):
@@ -345,8 +319,12 @@ class InputBar(Container):
         command = event.value.strip()
         if command:
             self.add_to_history(command)
-            self.post_message(self.CommandEntered(command))
+            self.post_message(CommandEntered(command))
         self.clear()
+
+    def on_click(self, event: events.Click) -> None:
+        """Force focus to the input field on click."""
+        self.query_one("#command-input", Input).focus()
 
     def on_key(self, event: events.Key) -> bool:
         if event.key == "up":
@@ -358,36 +336,63 @@ class InputBar(Container):
         return False
 
 
-class CommandEntered(str):
+class CommandEntered(events.Message):
     """Message sent when user enters a command."""
-
-    def __new__(cls, command: str):
-        return super().__new__(cls, command)
+    def __init__(self, command: str):
+        super().__init__()
+        self.command = command
 
 
 class StatusBar(Static):
     """Bottom status bar with system info."""
 
-    def __init__(self, version: str = "0.1.0", model: str = "", termux: bool = False, battery: int = 100, **kwargs):
+    def __init__(self, version: str = "0.1.0", model: str = "", project: str = "", termux: bool = False, battery: int = 100, **kwargs):
         super().__init__(**kwargs)
         self.version = version
         self.model = model
+        self.project = project
         self.termux = termux
         self.battery = battery
+        self.message = ""
+
+    def update(self, message: str = ""):
+        self.message = message
+        self.refresh()
 
     def render(self) -> str:
-        parts = [f"v{self.version}"]
+        parts = [self.message or f"NEXUS-OS v{self.version}"]
         if self.model:
-            parts.append(f"Model: {self.model}")
+            parts.append(f"CORE: [bold cyan]{self.model}[/]")
+        if self.project:
+            parts.append(f"PROJ: [bold yellow]{self.project}[/]")
         if self.termux:
-            parts.append("Termux: ✓")
+            parts.append("[bold green]MOBILE-LINK: ACTIVE[/]")
         if self.battery >= 0:
-            parts.append(f"Battery: {self.battery}%")
+            color = "green" if self.battery > 20 else "red"
+            parts.append(f"PWR: [{color}]{self.battery}%[/]")
         return " | ".join(parts)
 
 
-class PanelHeader(Static):
-    """Reusable panel header."""
+class Heartbeat(Static):
+    """Pulsing indicator for Nexus activity."""
+    
+    def on_mount(self) -> None:
+        self.set_interval(0.8, self.update_pulse)
+        self.pulse = 0
+        self.chars = ["▱▱▱▱", "▰▱▱▱", "▰▰▱▱", "▰▰▰▱", "▰▰▰▰", "▱▰▰▰", "▱▱▰▰", "▱▱▱▰"]
 
-    def __init__(self, title: str, **kwargs):
-        super().__init__(title, **kwargs)
+    def update_pulse(self) -> None:
+        self.pulse = (self.pulse + 1) % len(self.chars)
+        self.update(f"[bold cyan]NEURAL:{self.chars[self.pulse]}[/]")
+
+class Telemetry(Static):
+    """Live status display for system and steward metrics."""
+
+    def on_mount(self) -> None:
+        self.set_interval(2.0, self.update_metrics)
+        self._load = 3
+
+    def update_metrics(self) -> None:
+        import random
+        self._load = max(1, min(99, self._load + random.randint(-5, 5)))
+        self.update(f"[telemetry-item]MESH-LOAD: {self._load}% | STEWARD: READY[/]")

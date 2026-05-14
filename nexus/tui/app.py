@@ -16,6 +16,9 @@ from textual.screen import Screen, ModalScreen
 from textual.widgets import Static, Input, Header, Footer
 
 from .colors import CSS_COLORS
+from ..agent import get_orchestrator
+from ..agent.orchestrator import AgentOrchestrator
+from .task_wrapper import OrchestrationTask
 from .state import (
     TUIState,
     TUIStateManager,
@@ -37,7 +40,10 @@ from .widgets import (
     InputBar,
     StatusBar,
     CommandEntered,
+    Heartbeat,
+    Telemetry,
 )
+from .palette import CommandPalette
 
 
 class NexusTUI(App):
@@ -61,7 +67,9 @@ class NexusTUI(App):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.orchestrator = get_orchestrator()
         self.state_manager = get_state_manager()
+        self.orchestrator.set_ui_callback(self._on_orchestrator_event)
         self.state_manager.reset()
         self._input_buffer = ""
         self._command_history: list[str] = []
@@ -72,27 +80,36 @@ class NexusTUI(App):
         from .. import __version__
         self._version = __version__
 
+    def _on_orchestrator_event(self, event_type: str, data: Any):
+        """Bridge orchestrator brain events to TUI state manager."""
+        if event_type == "thinking":
+            self.state_manager.add_thinking_step(
+                data.get("number", 0),
+                data.get("description", ""),
+                data.get("details", "")
+            )
+        elif event_type == "agent_status":
+            self.state_manager.update_agent_status(
+                data.get("name"),
+                data.get("status"),
+                data.get("task")
+            )
+
     def compose(self) -> ComposeResult:
         """Create the layout."""
         yield Header()
-
-        with Container(id="app-container"):
-            yield ChatPanel(id="chat-panel")
-            yield ThinkingPanel(id="thinking-panel")
-            yield ToolPanel(id="tool-panel")
-            yield AgentsPanel(id="agents-panel")
+        
+        # Simple vertical stack to avoid recursion
+        yield ChatPanel(id="chat-panel", classes="neural-node")
+        yield ThinkingPanel(id="thinking-panel", classes="neural-node")
+        yield ToolPanel(id="tool-panel", classes="neural-node")
+        yield AgentsPanel(id="agents-panel", classes="neural-node")
 
         yield InputBar(id="input-bar")
-
-        status = StatusBar(
-            version=self._version,
-            model="",
-            termux=self._termux_mode,
-            battery=self._get_battery(),
-        )
-        yield status
-
+        yield StatusBar(id="status-bar")
+        
         yield Footer()
+
 
     def _get_battery(self) -> int:
         """Get battery percentage if available."""
@@ -106,8 +123,16 @@ class NexusTUI(App):
         return -1
 
     def on_mount(self) -> None:
-        """Initialize on mount."""
+        """Called when the TUI mounts. Auto-focus the input bar."""
+        self.query_one("#command-input", Input).focus()
         self.state_manager.subscribe(self._on_state_change)
+
+        # ... (rest of mount logic) ...
+        # Start Shadow Indexer (Proactive Background Learning)
+        import threading
+        from ..memory.shadow import get_shadow_indexer
+        self.shadow_indexer = get_shadow_indexer()
+        threading.Thread(target=self.shadow_indexer.start, daemon=True).start()
 
         chat_panel = self.query_one("#chat-panel", ChatPanel)
         chat_panel.add_message(ChatMessage(
@@ -117,34 +142,59 @@ class NexusTUI(App):
         ))
 
         self._update_status_bar()
-
     def _on_state_change(self, state: TUIState) -> None:
         """Handle state changes from the state manager."""
+        self._update_status_bar()
         chat_panel = self.query_one("#chat-panel", ChatPanel)
         thinking_panel = self.query_one("#thinking-panel", ThinkingPanel)
         tool_panel = self.query_one("#tool-panel", ToolPanel)
         agents_panel = self.query_one("#agents-panel", AgentsPanel)
 
-        for msg in state.messages[-5:]:
-            if len(chat_panel._messages) == 0 or chat_panel._messages[-1] != msg:
-                chat_panel.add_message(msg)
+        # Show the most recent message if it's new
+        if state.messages:
+            last_msg = state.messages[-1]
+            if len(chat_panel._messages) == 0 or chat_panel._messages[-1] != last_msg:
+                chat_panel.add_message(last_msg)
 
+        # Handle thinking/tools
         for step in state.thinking_steps:
-            thinking_panel.add_step(step)
+            if step not in thinking_panel._steps:
+                thinking_panel.add_step(step)
 
         for tool in state.tool_statuses.values():
             tool_panel.update_tool(tool)
 
+        # Handle agents
         for agent in state.active_agents:
             agents_panel.update_agent(agent)
+            
+            # Check if agent status is noteworthy
+            if agent.status == AgentStatus.THINKING:
+                chat_panel.add_message(ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=f"Agent {agent.name} is {agent.status.name.lower()}: {agent.task if hasattr(agent, 'task') else agent.current_task}",
+                    timestamp=datetime.now(),
+                ))
+
+    def on_command_entered(self, event: CommandEntered) -> None:
+        """Handle command entry."""
+        # Process the input through the wrapped orchestrator task
+        task = OrchestrationTask(self, self._process_input(event.command))
+        asyncio.create_task(task.run())
 
     def action_interrupt(self) -> None:
         """Handle Ctrl+C interrupt."""
-        self.post_message(self.Notification("Interrupted - use /exit to quit", severity="warning"))
+        self.notify("Interrupted - use /exit to quit", severity="warning")
 
     def action_command_palette(self) -> None:
-        """Placeholder for command palette."""
-        self.post_message(self.Notification("Command palette not yet implemented", severity="info"))
+        """Show command palette."""
+        def set_command(command: str | None):
+            if command:
+                input_bar = self.query_one("#command-input", Input)
+                input_bar.value = command
+                input_bar.focus()
+        
+        self.push_screen(CommandPalette(), set_command)
 
     def action_clear_screen(self) -> None:
         """Clear the chat panel."""
@@ -166,6 +216,14 @@ class NexusTUI(App):
         """Toggle agents panel visibility."""
         panel = self.query_one("#agents-panel", AgentsPanel)
         panel.toggle_class("hidden")
+
+    def on_click(self, event: events.Click) -> None:
+        """Globally handle clicks to ensure input bar is focused."""
+        try:
+            self.query_one("#command-input", Input).focus()
+        except:
+            pass
+        event.stop()
 
     def action_show_help(self) -> None:
         """Show help overlay."""
@@ -192,6 +250,8 @@ class NexusTUI(App):
 ║    /model    - Show/switch model                        ║
 ║    /facts    - Show stored facts                        ║
 ║    /session  - Show session info                         ║
+║    /doctor   - Run system diagnostics                    ║
+║    /cleanup  - Perform tactical cleanup                  ║
 ║    /exit     - Exit the TUI                              ║
 ╚══════════════════════════════════════════════════════════╝
         """
@@ -228,11 +288,15 @@ Agents: {len(state.active_agents)}
     def _update_status_bar(self) -> None:
         """Update the status bar with current info."""
         state = self.state_manager.state
-        status = self.query_one(StatusBar)
+        status_bar = self.query_one(StatusBar)
 
-        model = state.active_model or "not set"
-        if hasattr(status, "model"):
-            status.model = model
+        status_bar.model = state.active_model or "nexus-v2"
+        
+        # Get project info
+        import os
+        status_bar.project = os.path.basename(os.getcwd())
+        status_bar.battery = self._get_battery()
+        status_bar.refresh()
 
     def _handle_command(self, command: str) -> bool:
         """Handle slash commands. Returns True if handled."""
@@ -328,6 +392,49 @@ Agents: {len(state.active_agents)}
             ))
             return True
 
+        elif cmd == "doctor":
+            from ..doctor import NexusDoctor
+            doctor = NexusDoctor()
+            report = doctor.run_all()
+            
+            doctor_text = "[bold blue]NEXUS SYSTEM DIAGNOSTICS[/]\n"
+            for category, result in report.items():
+                status = "[bold green][OK][/]" if result.get("passed", True) else "[bold red][!][/] "
+                doctor_text += f"{status} {category.upper()}\n"
+                if category == "cache" and result.get("found_count", 0) > 0:
+                    from ..utils import format_bytes
+                    size = format_bytes(result['total_size_bytes'])
+                    doctor_text += f"    -> {result['found_count']} artifacts found ({size} potential savings)\n"
+            
+            chat_panel.add_message(ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=doctor_text.strip(),
+                timestamp=datetime.now(),
+            ))
+            return True
+
+        elif cmd == "cleanup":
+            from ..doctor import NexusDoctor
+            doctor = NexusDoctor()
+            
+            # First show what will be cleaned
+            report = doctor.tactical_cleanup(dry_run=True)
+            chat_panel.add_message(ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=f"Cleaning {report['potential_savings']} of cache artifacts...",
+                timestamp=datetime.now(),
+            ))
+            
+            # Execute actual cleanup
+            result = doctor.tactical_cleanup(dry_run=False)
+            chat_panel.add_message(ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=f"[bold green]Cleanup complete.[/] Freed {result['potential_savings']}.",
+                timestamp=datetime.now(),
+            ))
+            self._update_status_bar()
+            return True
+
         return False
 
     async def _process_input(self, user_input: str) -> None:
@@ -339,6 +446,8 @@ Agents: {len(state.active_agents)}
             return
 
         chat_panel = self.query_one("#chat-panel", ChatPanel)
+
+        # Echo the user message immediately
         chat_panel.add_message(ChatMessage(
             role=MessageRole.USER,
             content=user_input,
@@ -352,6 +461,7 @@ Agents: {len(state.active_agents)}
             from ..tools import get_registry
             from ..memory import get_memory
             from ..agent.orchestrator import AgentOrchestrator, AgentConfig
+            # ... rest of implementation ...
 
             manager = get_manager()
             registry = get_registry()
@@ -369,14 +479,34 @@ Agents: {len(state.active_agents)}
                 config=config,
             )
 
+            # Keep track of the current assistant message
+            self._current_assistant_message = None
+
             async def stream_callback(content: str):
-                chat_panel.add_message(ChatMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=content,
-                    timestamp=datetime.now(),
-                ))
+                if self._current_assistant_message is None:
+                    self._current_assistant_message = ChatMessage(
+                        role=MessageRole.ASSISTANT,
+                        content=content,
+                        timestamp=datetime.now(),
+                    )
+                    chat_panel.add_message(self._current_assistant_message)
+                else:
+                    self._current_assistant_message.content += content
+                    # Force update the widget directly
+                    # Get the widget corresponding to this message (last added)
+                    widgets = chat_panel.query(ChatMessageWidget)
+                    if widgets:
+                        widgets[-1].message = self._current_assistant_message
+                        widgets[-1].refresh()
+                self.state_manager.refresh()
 
             turn = await orchestrator.run(user_input, stream_callback=stream_callback)
+
+            # Ensure all state changes are reflected
+            self.state_manager.refresh()
+
+            # Ensure all state changes are reflected
+            self.state_manager.refresh()
 
             if turn.pending_approval:
                 self._handle_pending_approval(turn.pending_approval)
