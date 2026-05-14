@@ -4,7 +4,8 @@ import asyncio
 import logging
 import re
 import sys
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -103,6 +104,7 @@ def sanitize_error(error: str | Exception, max_length: int = 200) -> str:
 
 
 from ..errors import NexusError
+
 
 def format_error(error: Exception | str) -> str:
     """Format an exception or error string into a user-friendly message."""

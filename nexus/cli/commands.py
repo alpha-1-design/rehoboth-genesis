@@ -8,6 +8,9 @@ from pathlib import Path
 import click
 
 from nexus import __version__
+from nexus.config import NexusConfig, save_config
+from nexus.providers import Message, get_manager
+from nexus.tools import get_registry
 
 
 @click.group()
@@ -904,6 +907,7 @@ def doctor(ctx: click.Context) -> None:
 
 from ..utils.dependencies import ensure_dependency
 
+
 # Dashboard command (optional — lazy loaded)
 @cli.command("dashboard")
 @click.option("--port", default=5000, help="Port to run on")
@@ -995,7 +999,6 @@ def voice(
     display_welcome()
 
     import asyncio
-
 
     from ..personality import get_personality
     from ..voice import get_voice_engine
@@ -1186,7 +1189,7 @@ def main():
     # Load config and initialize
     config = load_config()
     config.ensure_dirs()
-    
+
     # Check for providers
     if not config.providers:
         from nexus.doctor import run_doctor

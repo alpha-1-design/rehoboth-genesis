@@ -1,7 +1,8 @@
 import difflib
 from pathlib import Path
-from typing import Any, Tuple
+
 from ..tools.base import BaseTool, ToolDefinition, ToolResult
+
 
 class InteractiveDiffTool(BaseTool):
     """Generates a unified diff for a file change and awaits human approval."""

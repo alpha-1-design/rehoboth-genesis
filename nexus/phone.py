@@ -14,11 +14,10 @@ Phone mode is auto-detected when:
   - STREAL environment variable is set (slow real connection)
 """
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 import os
 import shutil
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -97,18 +96,18 @@ def detect_display_profile() -> DisplayProfile:
         return DisplayProfiles.PHONE
     if os.environ.get("NEXUS_SSH_MODE"):
         return DisplayProfiles.SSH_SLOW
-    
+
     # Termux = phone
     if os.environ.get("TERMUX"):
         return DisplayProfiles.PHONE
-    
+
     # Try to detect terminal size
     try:
         size = shutil.get_terminal_size()
         width = size.columns
     except Exception:
         width = 80
-    
+
     if width < 100:
         return DisplayProfiles.PHONE
     elif width < 160:
@@ -194,7 +193,7 @@ class PhoneModeFormatter:
         lines.append(f"  {message}")
         if choices:
             lines.append(f"  Options: {', '.join(choices)}")
-        lines.append(f"  > ")
+        lines.append("  > ")
         return "\n".join(lines)
 
     def tool_result(self, tool_name: str, result: str, truncated: bool = False) -> str:
@@ -222,23 +221,23 @@ class PhoneModeFormatter:
         """Simple table that fits phone screens."""
         if not rows:
             return self.wrap(", ".join(headers))
-        
+
         col_widths = [len(h) for h in headers]
         for row in rows:
             for i, cell in enumerate(row):
                 col_widths[i] = max(col_widths[i], len(str(cell)[:50]))
-        
+
         col_widths = [min(w, 30) for w in col_widths]  # Cap at 30 chars
-        
+
         lines = []
         header_line = " | ".join(h[:w].ljust(w) for h, w in zip(headers, col_widths))
         lines.append(header_line)
         lines.append("-" * len(header_line))
-        
+
         for row in rows:
             row_line = " | ".join(str(c)[:w].ljust(w) for c, w in zip(row, col_widths))
             lines.append(row_line)
-        
+
         return "\n".join(lines)
 
     def file_diff(self, old_path: str, new_path: str | None = None) -> str:
@@ -301,10 +300,10 @@ class PhoneMode:
     def get_prompt(self, context: dict[str, Any] | None = None) -> str:
         """Get the compact phone-mode prompt."""
         ctx = context or {}
-        
+
         session_short = ctx.get("session_id", "nexus")[:6]
         agent_short = ctx.get("agent_name", "n")[:1]
-        
+
         return f"\033[1;36m{agent_short}@{session_short}\033[0m> "
 
     def get_banner(self) -> str:
@@ -347,13 +346,13 @@ class PhoneMode:
         line = line.strip()
         if not line.startswith("/"):
             return line
-        
+
         # Check short commands
         for short, full in PHONE_COMMANDS.items():
             if line.startswith(short):
                 remainder = line[len(short):]
                 return full + remainder
-        
+
         return line
 
 

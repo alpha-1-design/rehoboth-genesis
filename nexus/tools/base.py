@@ -6,9 +6,7 @@ Each tool has a name, description, schema, and execution function.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Callable
-import asyncio
-import inspect
+from typing import Any
 
 
 @dataclass
@@ -120,14 +118,14 @@ class ToolRegistry:
     ) -> "ToolRegistry":
         """Filter tools based on permission rules."""
         filtered = ToolRegistry()
-        
+
         for name, tool in self._tools.items():
             if denied and name in denied:
                 continue
             if allowed and name not in allowed:
                 continue
             filtered.register(tool)
-        
+
         return filtered
 
 

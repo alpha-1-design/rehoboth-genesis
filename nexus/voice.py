@@ -13,15 +13,15 @@ The voice engine orchestrates the pipeline and exposes:
 """
 
 import asyncio
-import base64
 import io
-import json
 import os
 import tempfile
-import wave
+import wave as wavelib
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import Any
+
 from .errors import NexusError
 from .utils import format_error
 
@@ -79,7 +79,7 @@ class FreeTTSProvider(TTSProvider):
 
     async def speak(self, text: str, config: VoiceConfig) -> bytes:
         import httpx
-        
+
         max_retries = 3
         async with httpx.AsyncClient() as client:
             for attempt in range(max_retries):
@@ -123,8 +123,6 @@ class FreeTTSProvider(TTSProvider):
                     print("[TTS] Audio playback skipped (PyAudio not installed)")
                     return
                 import pyaudio
-
-            import wave as wavelib
 
             wav_data = self._convert_to_wav(audio)
             pa = pyaudio.PyAudio()
@@ -262,9 +260,8 @@ class STTProvider(ABC):
                 raise NexusError("PyAudio is required for voice listening but is not installed.")
             import pyaudio
 
-        import wave as wavelib
+            p = pyaudio.PyAudio()
 
-        p = pyaudio.PyAudio()
         frames = []
         try:
             stream = p.open(
@@ -325,9 +322,8 @@ class STTProvider(ABC):
                 raise NexusError("PyAudio is required for voice listening but is not installed.")
             import pyaudio
 
-        import wave as wavelib
+            p = pyaudio.PyAudio()
 
-        p = pyaudio.PyAudio()
         frames = []
         try:
             stream = p.open(
@@ -599,15 +595,15 @@ class VoiceEngine:
     async def voice_mode(self) -> AsyncIterator[None]:
         """Async context manager for full voice conversation loop."""
         self._running = True
-        print("""
+        print(f"""
 ╔══════════════════════════════════════════════════════════╗
 ║              NEXUS VOICE MODE                           ║
 ║                                                           ║
 ║  Nexus is listening... Speak to chat.                    ║
 ║  Say 'exit' or press Ctrl+C to return to text mode.      ║
-║  Provider: TTS={}, STT={}                             ║
+║  Provider: TTS={self.config.tts_provider}, STT={self.config.stt_provider}                             ║
 ╚══════════════════════════════════════════════════════════╝
-""".format(self.config.tts_provider, self.config.stt_provider))
+""")
 
         await self.speak("Voice mode activated. I'm listening. What would you like to work on?")
 

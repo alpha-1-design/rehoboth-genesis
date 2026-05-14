@@ -1,25 +1,26 @@
 """Agent orchestrator - the core loop connecting AI, tools, and memory."""
 
-import asyncio
 import json
+import os
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Callable
+from pathlib import Path
+from typing import Any
 
-from ..providers import ProviderManager, Message, ToolCall
-from ..tools import ToolRegistry, ToolResult
-from ..errors import NexusError, ToolError
-from ..utils import format_error
+from ..agent.reflection import ReflectionEngine
+from ..agents import AgentRole, MultiAgentTeam
+from ..errors import NexusError
 from ..memory import Memory
-from ..thinking import ThinkingEngine, ThinkingState, get_thinking_engine
-from ..agents import MultiAgentTeam, AgentRole, init_team, get_team
-from ..plugins import get_plugin_manager
-from ..safety import get_safety_engine
 from ..orchestrator.decomposer import LLMAwareDecomposer
 from ..orchestrator.executor import ExecutionEngine
-from ..agent.reflection import ReflectionEngine
-from pathlib import Path
+from ..plugins import get_plugin_manager
+from ..providers import Message, ProviderManager, ToolCall
+from ..safety import get_safety_engine
+from ..thinking import ThinkingState, get_thinking_engine
+from ..tools import ToolRegistry, ToolResult
+from ..utils import format_error
 
 
 def estimate_tokens(text: str) -> int:
@@ -116,14 +117,14 @@ class AgentOrchestrator:
         self.memory = memory
         self.decomposer = LLMAwareDecomposer()
         self.executor = ExecutionEngine(
-            self.tools, 
+            self.tools,
             self._execute_tool_callback,
             llm_callback=self._execute_llm_callback,
             provider_manager=self.pm
         )
         self.config = config or AgentConfig()
         self.reflection_engine = ReflectionEngine(Path("./.nexus/sessions"))
-        
+
         # ... rest of init ...
         self._tool_call_count = 0
         self._messages: list[Message] = []
@@ -164,14 +165,14 @@ class AgentOrchestrator:
             # 1. Decompose
             plan = await self.decomposer.decompose(goal)
             self._notify_ui("thinking", {"description": f"Decomposed into {len(plan.steps)} steps"})
-            
+
             # 2. Execute steps
             results = []
             for step in plan.steps:
                 self._notify_ui("thinking", {"description": f"Executing: {step.description}"})
                 result = await self.executor.execute_step(step)
                 results.append(result)
-            
+
             self.reflection_engine.perform_reflection()
             return results
         except Exception as e:
@@ -183,7 +184,7 @@ class AgentOrchestrator:
     def team(self) -> MultiAgentTeam | None:
         return self._team
 
-    def spawn_agent(self, role: AgentRole, name: str | None = None, 
+    def spawn_agent(self, role: AgentRole, name: str | None = None,
                     task: str | None = None, model: str | None = None):
         """Spawn an agent with the given role."""
         if self._team is None:
@@ -356,7 +357,6 @@ class AgentOrchestrator:
         )
 
         # 1. Safety Check
-        from ..safety import get_safety_engine
         safety = get_safety_engine()
         context = {"tool": name, "args": args}
         for path_key in ("path", "filePath", "file_path"):
@@ -427,15 +427,15 @@ class AgentOrchestrator:
         try:
             if path.endswith(".py"):
                 import ast
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     ast.parse(f.read())
             elif path.endswith(".json"):
                 import json
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     json.load(f)
             elif path.endswith((".yaml", ".yml")):
                 import yaml
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     yaml.safe_load(f)
             return True, None
         except Exception as e:
@@ -450,7 +450,7 @@ class AgentOrchestrator:
             path = args.get("path")
             old_string = args.get("old_string")
             if path and os.path.exists(path):
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                with open(path, encoding="utf-8", errors="replace") as f:
                     content = f.read()
                 if old_string and old_string in content:
                     lines = content.splitlines()
@@ -460,7 +460,7 @@ class AgentOrchestrator:
                             hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i+1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
                             break
                 else:
-                    hint += f"\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
+                    hint += "\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
         elif tool_name == "bash" and "not found" in error.lower():
             hint += "\n\n[RECOVERY HINT] The command was not found. If this is a new tool, you might need to install it via 'apt install' or 'pip install'. In Termux, try 'pkg install'."
         elif "file not found" in error.lower() or "no such file" in error.lower():

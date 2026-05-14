@@ -4,10 +4,12 @@ Supports: OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Ollama, LM Studio,
 and any OpenAI-compatible endpoint.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
 import json
+from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
+from typing import Any
+
 import httpx
 
 
@@ -134,7 +136,7 @@ class OpenAIProvider(BaseProvider):
         **kwargs
     ) -> Response:
         client = self._get_client()
-        
+
         payload: dict[str, Any] = {
             "model": kwargs.get("model", self.model),
             "messages": [self._format_message(m) for m in messages],
@@ -147,7 +149,6 @@ class OpenAIProvider(BaseProvider):
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
 
-        import json as _json
         response = await client.post("/chat/completions", json=payload)
         if response.status_code != 200:
             response.raise_for_status()
@@ -174,7 +175,7 @@ class OpenAIProvider(BaseProvider):
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-        
+
         response = await client.post("/chat/completions", json=payload)
         response.raise_for_status()
         async for line in response.aiter_lines():
@@ -184,7 +185,7 @@ class OpenAIProvider(BaseProvider):
                 if data == "[DONE]":
                     yield StreamChunk(done=True)
                     return
-                
+
                 chunk_data = json.loads(data)
                 yield self._parse_stream_chunk(chunk_data)
 
@@ -215,10 +216,10 @@ class OpenAIProvider(BaseProvider):
     def _parse_response(self, data: dict[str, Any]) -> Response:
         choice = data["choices"][0]
         message = choice["message"]
-        
+
         content = message.get("content", "")
         tool_calls = []
-        
+
         if "tool_calls" in message:
             for tc in message["tool_calls"]:
                 tool_calls.append(ToolCall(
@@ -238,7 +239,7 @@ class OpenAIProvider(BaseProvider):
     def _parse_stream_chunk(self, data: dict[str, Any]) -> StreamChunk:
         delta = data["choices"][0].get("delta", {})
         content = delta.get("content", "")
-        
+
         tool_call = None
         if "tool_calls" in delta:
             for tc in delta["tool_calls"]:
@@ -254,7 +255,7 @@ class OpenAIProvider(BaseProvider):
                         arguments=args,
                     )
                     break
-        
+
         return StreamChunk(
             content=content,
             tool_call=tool_call,
@@ -291,7 +292,7 @@ class AnthropicProvider(BaseProvider):
         """Convert OpenAI-style tools to Anthropic format."""
         if not tools:
             return []
-        
+
         anthropic_tools = []
         for tool in tools:
             anthropic_tools.append({
@@ -560,7 +561,7 @@ class GeminiProvider(BaseProvider):
             payload["tools"] = self._format_tools(tools)
 
         url = f"{self.base_url}/models/{model}:streamGenerateContent?key={self.api_key}&alt=sse"
-        
+
         async with client.stream("POST", url, json=payload) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
@@ -576,7 +577,7 @@ class GeminiProvider(BaseProvider):
     async def list_models(self) -> list[ModelInfo]:
         client = self._get_client()
         url = f"{self.base_url}/models?key={self.api_key}"
-        
+
         try:
             response = await client.get(url)
             response.raise_for_status()

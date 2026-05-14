@@ -6,7 +6,8 @@ It takes a TaskPlan and executes steps in order, respecting dependencies.
 
 import asyncio
 import time
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from ..tools import ToolResult
 from ..utils import get_logger
@@ -42,15 +43,15 @@ NEEDS_TOOLS_KEYWORDS = [
 def is_structured_task(user_input: str) -> bool:
     """Detect if a task requires structured execution (not just chat)."""
     text = user_input.lower()
-    
+
     for keyword in TASK_KEYWORDS:
         if keyword in text:
             return True
-    
+
     for keyword in NEEDS_TOOLS_KEYWORDS:
         if keyword in text:
             return True
-    
+
     return False
 
 
@@ -83,21 +84,21 @@ class ExecutionEngine:
         """Prompt user for multi-key parallel processing consent."""
         if self._consent_asked:
             return self._multi_key_enabled
-        
+
         from ..providers import get_manager
         manager = get_manager()
         enabled = manager.get_enabled_providers()
-        
+
         if len(enabled) < 2:
             return False
 
         print("\n  \033[34m╼\033[0m \033[36mnexus/orchestrator\033[0m \033[1mHeavy task detected.\033[0m")
         print(f"    Multiple API keys detected ({', '.join(enabled)}).")
         choice = input("    \033[1mActivate Parallel Neural Processing (Multi-Key)?\033[0m (y/N): ").strip().lower()
-        
+
         self._consent_asked = True
         self._multi_key_enabled = choice in ('y', 'yes')
-        
+
         if self._multi_key_enabled:
             print("    \033[32m✔\033[0m Multi-key orchestration engaged.")
         return self._multi_key_enabled
@@ -109,14 +110,14 @@ class ExecutionEngine:
     ) -> tuple[bool, str]:
         """Execute a task plan and return (success, summary)."""
         plan.start()
-        
+
         if self.is_heavy_task(plan):
             await self._ask_multi_key_consent()
-        
+
         completed: set[str] = set()
         results: dict[str, Any] = {}
         batches = plan.get_parallel_batches(completed, results)
-        
+
         for batch_idx, batch in enumerate(batches):
             if self._multi_key_enabled and len(batch) > 1:
                 # Parallel execution across multiple providers
@@ -125,7 +126,7 @@ class ExecutionEngine:
                 for step in batch:
                     # Sequential or standard single-provider parallel (if supported by executor)
                     await self._execute_step_with_retries(step, plan, batch_idx, len(batches), progress_callback)
-            
+
             # Update results for next batch
             for step in batch:
                 if step.status == StepStatus.COMPLETED:
@@ -143,7 +144,7 @@ class ExecutionEngine:
         from ..providers import get_manager
         manager = get_manager()
         providers = manager.get_enabled_providers()
-        
+
         # Distribute steps across providers
         tasks = []
         for i, step in enumerate(batch):
@@ -152,22 +153,22 @@ class ExecutionEngine:
             step.started_at = time.time()
             if progress_callback:
                 progress_callback(f"{step.description} [\033[36m{prov}\033[0m]", StepStatus.RUNNING, "PARALLEL")
-            
+
             # This is a simplification; actual tool execution might need to be wrapped differently
             # for different providers if they have different tool calling formats
             tasks.append(self._execute_step(step, plan, progress_callback, provider_name=prov))
-            
+
         await asyncio.gather(*tasks)
 
     async def _execute_step_with_retries(self, step, plan, batch_idx, total_batches, progress_callback):
         step_num = batch_idx + 1
         status_text = f"{step_num}/{total_batches}"
-        
+
         if progress_callback:
             progress_callback(step.description, StepStatus.RUNNING, status_text)
-        
+
         success = await self._execute_step(step, plan, progress_callback)
-        
+
         if not success and step.max_retries > 0:
             for retry in range(step.max_retries):
                 step.retry_count = retry + 1
@@ -176,7 +177,7 @@ class ExecutionEngine:
                 success = await self._execute_step(step, plan, progress_callback)
                 if success:
                     break
-        
+
         if progress_callback:
             if success:
                 progress_callback(step.description, StepStatus.COMPLETED, status_text)
@@ -194,7 +195,7 @@ class ExecutionEngine:
         """Execute a single step."""
         step.status = StepStatus.RUNNING
         step.started_at = time.time()
-        
+
         try:
             if step.step_type == StepType.PLANNING:
                 result = await self._execute_llm_step(step, provider_name=provider_name)
@@ -206,11 +207,11 @@ class ExecutionEngine:
                 result = await self._execute_tool_step(step)
             else:
                 result = await self._execute_llm_step(step, provider_name=provider_name)
-            
+
             step.completed_at = time.time()
             step.actual_duration_ms = step.duration_ms()
             self._step_results[step.id] = result
-            
+
             if isinstance(result, ToolResult):
                 if result.success:
                     step.status = StepStatus.COMPLETED
@@ -224,7 +225,7 @@ class ExecutionEngine:
                 step.status = StepStatus.COMPLETED
                 step.result = result
                 return True
-                
+
         except Exception as e:
             step.completed_at = time.time()
             step.status = StepStatus.FAILED
@@ -241,9 +242,9 @@ class ExecutionEngine:
                 content="",
                 error=f"Tool '{step.tool_name}' not found",
             )
-        
+
         resolved_args = self._resolve_step_args(step)
-        
+
         return await self.execute_tool(step.tool_name, resolved_args)
 
     async def _execute_llm_step(self, step: ExecutionStep, provider_name: str | None = None) -> str:
@@ -276,13 +277,13 @@ class ExecutionEngine:
     def _resolve_step_args(self, step: ExecutionStep) -> dict[str, Any]:
         """Resolve step arguments, substituting dependency results."""
         resolved = step.args.copy()
-        
+
         for key, value in resolved.items():
             if isinstance(value, str) and value.startswith("$"):
                 dep_id = value[1:]
                 if dep_id in self._step_results:
                     resolved[key] = self._step_results[dep_id]
-        
+
         return resolved
 
     async def execute_from_llm_response(
@@ -293,20 +294,20 @@ class ExecutionEngine:
         """Execute tool calls in dependency order if provided."""
         if not tool_calls:
             return []
-        
+
         steps = self._tool_calls_to_steps(tool_calls)
         plan = TaskPlan(task="LLM response execution", goal="Execute LLM tool calls", steps=steps)
-        
+
         batches = plan.get_parallel_batches(completed=set(), results={})
         results = []
-        
+
         for batch in batches:
             batch_results = await asyncio.gather(
                 *[self._execute_step(step, plan, progress_callback) for step in batch],
                 return_exceptions=True,
             )
             results.extend(batch_results)
-        
+
         return results
 
     def _tool_calls_to_steps(self, tool_calls: list[dict[str, Any]]) -> list[ExecutionStep]:

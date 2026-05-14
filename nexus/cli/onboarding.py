@@ -1,9 +1,9 @@
+
 import click
-import os
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
+
 from ..config import NexusConfig, ProviderConfig, save_config
 from ..personality import get_personality
+
 
 class OnboardingManager:
     """
@@ -92,7 +92,6 @@ class OnboardingManager:
 
     def _finalize_setup(self, provider: str, model: str, api_key: str):
         # This mirrors the existing ProviderConfig creation but with the new flow
-        from ..config import ProviderConfig
 
         # Basic provider type mapping
         types = {"ollama": "openai", "opencode-zen": "openai"}

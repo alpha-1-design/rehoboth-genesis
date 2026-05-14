@@ -7,21 +7,20 @@ import sys
 import time
 from typing import Any
 
-from ..providers import Message, get_manager
-from ..tools import get_registry, ToolResult
-from ..memory import get_memory
 from ..agent import get_orchestrator
-from ..agents import init_team, get_team, AgentRole, MultiAgentTeam
-from ..thinking import ThinkingEngine, get_thinking_engine, ThinkingState
-from ..ui import LoadingIndicator, ProgressTracker
-from ..plan import PlanMode, get_plan_mode, set_plan_mode, should_trigger_plan_mode
-from ..sessions import get_session_loader
-from ..safety import get_safety_engine, SafetyEngine
-from ..sync import get_sync_engine
+from ..agents import AgentRole, MultiAgentTeam, init_team
 from ..learn import get_learning_engine
+from ..personality import Personality, get_personality
+from ..phone import PhoneMode, get_phone_mode
+from ..plan import PlanMode, set_plan_mode
+from ..providers import Message
+from ..safety import SafetyEngine, get_safety_engine
 from ..self_improve import get_self_improver
-from ..personality import get_personality, Personality
-from ..phone import get_phone_mode, PhoneMode
+from ..sessions import get_session_loader
+from ..sync import get_sync_engine
+from ..thinking import ThinkingState, get_thinking_engine
+from ..tools import ToolResult
+from ..ui import ProgressTracker
 from ..voice import get_voice_engine
 
 
@@ -39,7 +38,7 @@ class REPL:
         self.running = True
         self.streaming = True
         self.team: MultiAgentTeam | None = init_team(lead_name="nexus", pm=self.manager)
-        
+
         # New systems
         self.safety: SafetyEngine = get_safety_engine()
         self.sync_engine = get_sync_engine()
@@ -47,10 +46,10 @@ class REPL:
         self.improver = get_self_improver()
         self.personality: Personality = get_personality()
         self.phone: PhoneMode = get_phone_mode()
-        
+
         # Session auto-load
         self.session_loader = get_session_loader()
-        
+
         # Initialize multi-agent team
         self.team = init_team(lead_name="nexus", pm=self.manager)
         self.team.on_message(self._on_team_message)
@@ -79,9 +78,9 @@ class REPL:
         print("Trying OpenCode Zen free models (no API key needed)...\n")
 
         try:
-            from ..providers.base import PROVIDER_REGISTRY
-            from ..config import ProviderConfig, save_config
             from .. import config as cfg_module
+            from ..config import ProviderConfig, save_config
+            from ..providers.base import PROVIDER_REGISTRY
 
             opencode_config = ProviderConfig(
                 name="opencode-zen",
@@ -149,7 +148,7 @@ class REPL:
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         symbols = ["-", "\\", "|", "/", "◢", "◣", "◤", "◥"]
         print(f"  {dim}SCANNING PERMISSIONS... {reset}", end="", flush=True)
         for _ in range(5):
@@ -158,7 +157,7 @@ class REPL:
             sys.stdout.flush()
             time.sleep(0.05)
         sys.stdout.write("\b  \n")
-        
+
         path_keys = ("path", "filePath", "file_path", "directory", "workdir")
         context: dict = {"tool": tool_name, "args": arguments}
         for key in path_keys:
@@ -188,7 +187,7 @@ class REPL:
         """Configure readline for better editing."""
         readline.parse_and_bind("tab: complete")
         readline.parse_and_bind("set editing-mode vi")
-        
+
         # History file
         histfile = self._get_histfile()
         try:
@@ -273,7 +272,7 @@ class REPL:
         """Get the multi-layered system prompt for the agent (The Memory Harness)."""
         # Layer 1: Core Identity & Voice
         voice_prompt = self.personality.get_voice_system_prompt()
-        
+
         # Layer 2: Safety Mode & Operational Guidelines
         safety_mode = self.safety.get_mode().name
         safety_guidelines = f"Current Safety Mode: {safety_mode}\n"
@@ -285,7 +284,7 @@ class REPL:
         # Layer 3: Project Architecture & Environment
         project_summary = "Environment: Termux (Android)\n"
         project_summary += f"Project Structure: {self.indexer.get_summary()}\n"
-        
+
         # Layer 4: Active Working Memory (Last 5 files read/edited)
         recent_files = self.safety.get_read_files()[-5:]
         working_memory = ""
@@ -337,7 +336,7 @@ When using tools, always provide clear feedback about what you're doing.
 
         # Visual 'Context Pulse'
         self._show_context_pulse()
-        
+
         # Add user message
         self.messages.append(Message(role="user", content=user_input))
         self.session.messages.append({"role": "user", "content": user_input})
@@ -385,20 +384,20 @@ When using tools, always provide clear feedback about what you're doing.
                                         if path_key in tool_call.arguments:
                                             self.safety.mark_file_read(tool_call.arguments[path_key])
                                             break
-                                
+
                                 # Visual Kinetic Write for file writes
                                 if tool_call.name == "write" or tool_call.name == "edit":
                                     self._show_kinetic_stream(tool_call.arguments.get("path", "file"))
-                                
+
                                 result = await tool.execute(**tool_call.arguments)
-                                
+
                                 # THE REFINER'S FIRE: Post-Execution Validation
                                 if result.success and tool_call.name in ("write", "edit"):
                                     validation_passed, validation_error = await self._run_refiners_fire(tool_call.arguments.get("path"))
                                     if not validation_passed:
                                         result.success = False
                                         result.content = f"[REJECTED BY FIRE] The work was performed, but it failed the integrity check:\n{validation_error}\n\n[RECOVERY] I have detected an impurity in the logic. You must fix this error before proceeding."
-                                
+
                                 if not result.success:
                                     result.content = await self._handle_tool_failure(
                                         tool_call.name, tool_call.arguments, result.error or result.content
@@ -460,7 +459,7 @@ When using tools, always provide clear feedback about what you're doing.
 
             else:
                 response = await self.manager.complete(messages, tools)
-                
+
                 # Handle tool calls
                 for tool_call in response.tool_calls:
                     tool = self.registry.get(tool_call.name)
@@ -474,11 +473,11 @@ When using tools, always provide clear feedback about what you're doing.
                                     if path_key in tool_call.arguments:
                                         self.safety.mark_file_read(tool_call.arguments[path_key])
                                         break
-                            
+
                             # Visual Kinetic Write
                             if tool_call.name == "write" or tool_call.name == "edit":
                                 self._show_kinetic_stream(tool_call.arguments.get("path", "file"))
-                                
+
                             result = await tool.execute(**tool_call.arguments)
                             if not result.success:
                                 result.content = await self._handle_tool_failure(
@@ -491,14 +490,14 @@ When using tools, always provide clear feedback about what you're doing.
                                 error=result.error or result.content,
                                 context={"session": self.session.id},
                             )
-                        
+
                         # Add assistant's tool_call message to history
                         messages.append(Message(
                             role="assistant",
                             content=response.content,
                             tool_calls=[tool_call]
                         ))
-                        
+
                         # Add tool result message
                         messages.append(Message(
                             role="tool",
@@ -541,7 +540,7 @@ When using tools, always provide clear feedback about what you're doing.
         dim = "\033[90m"
         reset = "\033[0m"
         bold = "\033[1m"
-        
+
         icons = {
             "python": "🐍 [PYTHON_ENV]",
             "node": "🟢 [NODE_JS]",
@@ -549,10 +548,10 @@ When using tools, always provide clear feedback about what you're doing.
             "git": "🌿 [GIT_REPO]",
             "rust": "🦀 [RUST_CARGO]",
         }
-        
+
         icon = icons.get(stack.lower(), f"◈ [{stack.upper()}]")
         print(f"\n  {cyan}◈ INITIALIZING TECH STACK: {bold}{icon}{reset}")
-        
+
         # Atmospheric loading bar
         bar_width = 30
         for i in range(bar_width + 1):
@@ -566,11 +565,10 @@ When using tools, always provide clear feedback about what you're doing.
 
     def _show_context_pulse(self) -> None:
         """Visual effect for context layer injection."""
-        import random
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         layers = ["IDENTITY", "SAFETY", "PROJECT", "MEMORY", "USER"]
         print(f"  {dim}INITIALIZING NEURAL LAYERS: {reset}", end="", flush=True)
         for layer in layers:
@@ -584,7 +582,7 @@ When using tools, always provide clear feedback about what you're doing.
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         agent_names = [a.name for a in spawned_agents]
         print(f"  {cyan}◈ NEURAL BRANCHING DETECTED{reset}")
         for name in agent_names:
@@ -596,10 +594,10 @@ When using tools, always provide clear feedback about what you're doing.
         green = "\033[32m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         filename = os.path.basename(path)
         print(f"  {dim}STREAMING DATA TO {reset}{green}{filename}{reset} {dim}...", end="", flush=True)
-        
+
         # Kinetic particle stream
         particles = ["·", "•", "◦", "◙", "▫"]
         for _ in range(12):
@@ -613,38 +611,38 @@ When using tools, always provide clear feedback about what you're doing.
         """Perform a mandatory integrity check on modified code (The Refiner's Fire)."""
         if not path or not os.path.exists(path):
             return True, None
-            
+
         red = "\033[31m"
         green = "\033[32m"
         reset = "\033[0m"
-        
+
         # 1. Syntax Check (The first test of fire)
         if path.endswith(".py"):
             try:
                 import ast
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     ast.parse(f.read())
             except SyntaxError as e:
                 return False, f"Syntax Error: {e.msg} (line {e.lineno})"
             except Exception as e:
                 return False, str(e)
-        
+
         # 1. Syntax Check (The first test of fire)
         if path.endswith(".py"):
             try:
                 import ast
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     ast.parse(f.read())
             except SyntaxError as e:
                 return False, f"Syntax Error: {e.msg} (line {e.lineno})"
             except Exception as e:
                 return False, str(e)
-        
+
         elif path.endswith(".json"):
             # 2. JSON Validation
             try:
                 import json
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     json.load(f)
             except Exception as e:
                 return False, f"Invalid JSON: {str(e)}"
@@ -653,7 +651,7 @@ When using tools, always provide clear feedback about what you're doing.
             # 3. YAML Validation
             try:
                 import yaml
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     yaml.safe_load(f)
             except Exception as e:
                 return False, f"Invalid YAML: {str(e)}"
@@ -666,15 +664,15 @@ When using tools, always provide clear feedback about what you're doing.
         """Perform automatic diagnostics and recovery hints for tool failures."""
         import os
         hint = f"Error: {error}"
-        
+
         # 1. Edit Tool Context Mismatch
         if tool_name == "edit" and "context mismatch" in error.lower():
             path = arguments.get("path")
             old_string = arguments.get("old_string")
             if path and os.path.exists(path):
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                with open(path, encoding="utf-8", errors="replace") as f:
                     content = f.read()
-                
+
                 # Check if old_string exists without context
                 if old_string and old_string in content:
                     lines = content.splitlines()
@@ -684,15 +682,15 @@ When using tools, always provide clear feedback about what you're doing.
                             hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i+1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
                             break
                 else:
-                    hint += f"\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
+                    hint += "\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
 
         # 2. Bash Tool Command Not Found
         elif tool_name == "bash" and "not found" in error.lower():
-            hint += f"\n\n[RECOVERY HINT] The command was not found. If this is a new tool, you might need to install it via 'apt install' or 'pip install'. In Termux, try 'pkg install'."
+            hint += "\n\n[RECOVERY HINT] The command was not found. If this is a new tool, you might need to install it via 'apt install' or 'pip install'. In Termux, try 'pkg install'."
 
         # 3. File Not Found
         elif "file not found" in error.lower() or "no such file" in error.lower():
-            hint += f"\n\n[RECOVERY HINT] Verify the path exists using 'list' or 'glob'. Paths should usually be relative to the project root."
+            hint += "\n\n[RECOVERY HINT] Verify the path exists using 'list' or 'glob'. Paths should usually be relative to the project root."
 
         return hint
 
@@ -744,11 +742,11 @@ Available commands:
                 print(f"Current safety mode: \033[96m{current}\033[0m")
                 print("Available modes: user_review, read_only, strict, auto_git, sensitive, sandbox, unrestricted")
                 return True
-            
+
             try:
                 mode_map = {m.name.lower(): m for m in SafetyMode}
                 mode_map.update({m.value.lower(): m for m in SafetyMode})
-                
+
                 if args.lower() in mode_map:
                     new_mode = mode_map[args.lower()]
                     self.safety.set_mode(new_mode)
@@ -760,20 +758,20 @@ Available commands:
             return True
 
         elif cmd == "reflect":
-            print(f"\n\033[36m◈ INITIATING SESSION REFLECTION\033[0m")
+            print("\n\033[36m◈ INITIATING SESSION REFLECTION\033[0m")
             stats = self.learning.get_session_stats(self.session.id)
             failures = stats.get("failures", [])
             successes = stats.get("tool_usage", {})
-            
+
             print(f"  \033[90mTotal Cycles:\033[0m {sum(successes.values())}")
             print(f"  \033[90mAnomalies Detected:\033[0m {len(failures)}")
-            
+
             if failures:
-                print(f"\n  \033[31mCritical Failure Nodes:\033[0m")
+                print("\n  \033[31mCritical Failure Nodes:\033[0m")
                 for f in failures[-3:]:
                     print(f"    - {f['tool_name']}: {f['error'][:60]}...")
-            
-            print(f"\n\033[36m  ◈ LOGIC OPTIMIZATION: NOMINAL\033[0m\n")
+
+            print("\n\033[36m  ◈ LOGIC OPTIMIZATION: NOMINAL\033[0m\n")
             return True
 
         elif cmd == "clear":
@@ -951,7 +949,7 @@ Available commands:
             return True
 
         elif cmd == "stats":
-            print(f"\nAgent Statistics:")
+            print("\nAgent Statistics:")
             print(f"  Turn count: {self.session.id[:8]}")
             print(f"  Messages: {len(self.messages)}")
             print(f"  Tool calls: {self._tool_call_count}")
@@ -971,7 +969,7 @@ Available commands:
             return True
 
         elif cmd == "status":
-            print(f"\nNEXUS v0.1.0")
+            print("\nNEXUS v0.1.0")
             print(f"  Status: {'● ONLINE' if self.running else '○ OFFLINE'}")
             print(f"  Model: {self.manager.active_provider}")
             print(f"  Session: {self.session.id[:16]}")
@@ -1010,7 +1008,7 @@ Available commands:
             parts = args.split(maxsplit=1) if args else []
             subcmd = parts[0] if parts else "list"
             subargs = parts[1] if len(parts) > 1 else ""
-            
+
             if subcmd == "list":
                 plugins = pm.list_all()
                 if not plugins:
@@ -1035,10 +1033,10 @@ Available commands:
 
         elif cmd == "doctor":
             print("\n[DIAGNOSTICS]")
-            print(f"  Config: /root/.nexus/config.json exists")
+            print("  Config: /root/.nexus/config.json exists")
             print(f"  Providers: {len(self.manager.configs)} configured")
             print(f"  Tools: {len(self.registry.list_all())} available")
-            print(f"  Termux: available")
+            print("  Termux: available")
             print(f"  Plugins: {len(get_plugin_manager().list_all())} loaded")
             print(f"  Safety rules: {len(self.safety.rules)} loaded")
             print(f"  Learning lessons: {self.learning.get_stats()['total_lessons']}")
@@ -1197,11 +1195,11 @@ Available commands:
         """Run plan mode for the given task."""
         if not self._plan_mode:
             return
-        
+
         try:
             plan = await self._plan_mode.generate_plan(self.manager, self.messages)
             print(self._plan_mode.format_for_display())
-            
+
             # Wait for user input
             try:
                 action = input("Action (A=approve all, S=skip low, Q=quit): ").strip().lower()
@@ -1209,7 +1207,7 @@ Available commands:
                 print("Plan mode cancelled.")
                 self._plan_active = False
                 return
-            
+
             if action == "a":
                 self._plan_mode.approve_all()
                 print("All steps approved. Use /build to execute.")
@@ -1228,15 +1226,15 @@ Available commands:
         """Execute the current plan."""
         if not self._plan_mode or not self._plan_mode.plan:
             return
-        
+
         approved = self._plan_mode.get_approved_steps()
         if not approved:
             print("No approved steps to execute.")
             return
-        
+
         print(f"\nExecuting {len(approved)} approved steps...")
         tracker = ProgressTracker(len(approved), "Executing plan")
-        
+
         for step in approved:
             tracker.step(step.description)
             if step.tool_name:
@@ -1247,7 +1245,7 @@ Available commands:
                         step.result = result.content[:100]
                     except Exception as e:
                         step.error = str(e)
-        
+
         tracker.finish()
         self._plan_active = False
 
@@ -1270,7 +1268,7 @@ Available commands:
         while self.running:
             try:
                 line = input(self._get_prompt()).strip()
-                
+
                 if not line:
                     continue
 
@@ -1316,7 +1314,7 @@ Available commands:
     def _on_thinking_update(self, event) -> None:
         """Handle thinking engine updates."""
         event_type, step = event
-        
+
         if event_type == "start":
             if step.state == ThinkingState.ANALYZING:
                 self._show_loading("Analyzing task...")
@@ -1339,15 +1337,14 @@ Available commands:
     def _show_loading(self, message: str) -> None:
         """Show a 'Synaptic Pulse' loading indicator."""
         if not self._first_token_received:
-            import random
             cyan = "\033[36m"
             dim = "\033[90m"
             reset = "\033[0m"
-            
+
             # Atmospheric synaptic pulse symbols
             pulses = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
             symbol = pulses[int(time.time() * 10) % len(pulses)]
-            
+
             sys.stdout.write(f"\r  {cyan}{symbol}{reset} {dim}{message.upper()}{reset}")
             sys.stdout.flush()
 
@@ -1388,22 +1385,22 @@ Available commands:
             print(f"  {dim}╰ Failure Node:{reset} {step.detail or 'Execution failed'}")
         else:
             duration = f"{dim}[{step.duration_ms:.0f}ms]{reset}" if step.duration_ms else ""
-            
+
             # Special Box for Shell/Git commands
             if step.tool_name in ("bash", "git"):
                 self._draw_shell_box(step.tool_name, step.tool_result, term_width)
-            
+
             # Diff Box for Edits
             elif step.tool_name == "edit" and "applied successfully" in step.tool_result.lower():
                 self._draw_diff_box(step.tool_args, term_width)
-            
+
             # Data Harvest effect for Web tools
             elif step.tool_name in ("web_fetch", "web_search", "codesearch"):
                 cyan = "\033[36m"
                 print(f"  {cyan}╰ DATA HARVEST COMPLETE{reset} {duration}")
                 if step.tool_result:
                     self._draw_harvest_grid(step.tool_result, term_width)
-            
+
             # Scrubbing effect for Read
             elif step.tool_name == "read" and step.tool_result:
                 cyan = "\033[36m"
@@ -1440,31 +1437,31 @@ Available commands:
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         # Determine box width (capped at 100 or term_width - 4)
         box_width = min(100, term_width - 8)
         header = f" {tool_name.upper()} CONSOLE "
         padding = (box_width - len(header)) // 2
-        
+
         top_border = f"  {cyan}╔" + "═" * padding + header + "═" * (box_width - padding - len(header)) + "╗" + reset
         bottom_border = f"  {cyan}╚" + "═" * box_width + "╝" + reset
-        
+
         print(top_border)
-        
+
         lines = content.strip().split("\n")
         max_lines = 15 # Don't overwhelm the screen
-        
+
         for i, line in enumerate(lines):
             if i >= max_lines:
                 print(f"  {cyan}║{reset}  {dim}... (+{len(lines) - max_lines} more lines){reset}" + " " * (box_width - 25) + f"{cyan}║{reset}")
                 break
-            
+
             # Truncate line if it's too long for the box
             display_line = line[:box_width-4]
             # Pad the line to keep the right border aligned
             padding_needed = box_width - len(display_line) - 2
             print(f"  {cyan}║{reset}  {display_line}" + " " * padding_needed + f"{cyan}║{reset}")
-            
+
         print(bottom_border)
 
     def _draw_diff_box(self, tool_args: dict, term_width: int) -> None:
@@ -1472,30 +1469,30 @@ Available commands:
         path = tool_args.get("path", "file")
         old_text = tool_args.get("old_string", "")
         new_text = tool_args.get("new_string", "")
-        
+
         green = "\033[32m"
         red = "\033[31m"
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         box_width = min(100, term_width - 8)
         print(f"  {cyan}╔" + "═" * ((box_width - 12) // 2) + " DIFF SOURCE " + "═" * (box_width - ((box_width - 12) // 2) - 13) + "╗")
         print(f"  {cyan}║{reset} {dim}File: {path}{reset}" + " " * (box_width - len(path) - 8) + f"{cyan}║")
         print(f"  {cyan}╠" + "═" * box_width + "╣")
-        
+
         # Show what was removed (Red)
         for line in old_text.splitlines():
             display_line = line[:box_width-6]
             padding = box_width - len(display_line) - 4
             print(f"  {cyan}║{reset} {red}-{reset} {display_line}" + " " * padding + f"{cyan}║")
-            
+
         # Show what was added (Green)
         for line in new_text.splitlines():
             display_line = line[:box_width-6]
             padding = box_width - len(display_line) - 4
             print(f"  {cyan}║{reset} {green}+{reset} {display_line}" + " " * padding + f"{cyan}║")
-            
+
         print(f"  {cyan}╚" + "═" * box_width + "╝" + reset)
 
     def _draw_harvest_grid(self, content: str, term_width: int) -> None:
@@ -1503,30 +1500,30 @@ Available commands:
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         indent = "    "
         print(f"{indent}{dim}┌─ SHARED DATA STREAM ────────────────┐{reset}")
-        
+
         # Take a snippet and format it as a grid
         text = content[:400].replace("\n", " ")
         words = text.split()
-        
+
         current_line = f"{indent}{dim}│{reset} "
         line_len = 0
         max_width = min(60, term_width - 15)
-        
+
         for word in words:
             if line_len + len(word) > max_width:
                 print(current_line + " " * (max_width - line_len + 1) + f"{dim}│{reset}")
                 current_line = f"{indent}{dim}│{reset} "
                 line_len = 0
-            
+
             current_line += word + " "
             line_len += len(word) + 1
-            
+
         if line_len > 0:
             print(current_line + " " * (max_width - line_len + 1) + f"{dim}│{reset}")
-            
+
         print(f"{indent}{dim}└─────────────────────────────────────┘{reset}")
 
     def _show_complete(self, step) -> None:
@@ -1537,11 +1534,11 @@ Available commands:
         """Show task complete summary with Neural Activity styling."""
         elapsed = step.duration_ms / 1000.0 if step.duration_ms else 0
         tool_count = self._tool_call_count
-        
+
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
-        
+
         print(f"\n  {cyan}◈ NEURAL ACTIVITY STABILIZED{reset}")
         print(f"    {dim}latency: {elapsed:.2f}s | cycles: {tool_count} | status: nominal{reset}\n")
 

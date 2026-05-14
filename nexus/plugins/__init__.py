@@ -8,10 +8,11 @@ import importlib
 import importlib.util
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
 

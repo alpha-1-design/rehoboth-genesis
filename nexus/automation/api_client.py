@@ -1,12 +1,11 @@
 """API automation client for HTTP-based web interactions with anti-detection."""
 
-import asyncio
 import random
 import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin
 
 try:
     import httpx
@@ -41,7 +40,7 @@ class ApiRequest:
 @dataclass
 class ApiAutomation:
     """API automation client with session, cookie management, and anti-detection."""
-    
+
     base_url: str = ""
     headers: dict[str, str] = field(default_factory=lambda: {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -62,7 +61,7 @@ class ApiAutomation:
     min_delay: float = 1.0
     max_delay: float = 3.0
     proxy: str | None = None
-    
+
     _client: "httpx.AsyncClient | None" = None
     _response_history: list[dict] = field(default_factory=list)
     _last_request_time: float = 0.0
@@ -77,9 +76,9 @@ class ApiAutomation:
         """Get or create the HTTP client."""
         if self._client is None:
             cookies = {**self.cookies} if self.cookies else {}
-            
+
             transport = httpx.AsyncHTTPTransport(retries=1)
-            
+
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 headers=self.headers,
@@ -95,24 +94,24 @@ class ApiAutomation:
     def _rotate_headers(self, request: ApiRequest) -> dict[str, str]:
         """Apply anti-detection header rotation."""
         headers = {**self.headers, **request.headers}
-        
+
         if self.user_agent_rotation:
             headers["User-Agent"] = self._current_user_agent
-        
+
         if request.referrer:
             headers["Referer"] = request.referrer
         elif self._request_count > 0:
             prev = self._response_history[-1] if self._response_history else None
             if prev:
                 headers["Referer"] = prev.get("url", "")
-        
+
         if self._request_count == 0:
             headers["Sec-Fetch-Site"] = "none"
             headers["Sec-Fetch-Dest"] = "document"
         else:
             headers["Sec-Fetch-Site"] = "same-origin"
             headers["Sec-Fetch-Dest"] = "empty"
-        
+
         return headers
 
     def _apply_delay(self) -> None:
@@ -126,15 +125,15 @@ class ApiAutomation:
     async def request(self, request: ApiRequest) -> dict[str, Any]:
         """Execute an API request with anti-detection."""
         self._apply_delay()
-        
+
         client = await self._get_client()
-        
+
         request_headers = self._rotate_headers(request)
         request_params = {**request.params}
         request_data = request.data.copy()
-        
+
         self._request_count += 1
-        
+
         try:
             response = await client.request(
                 method=request.method,
@@ -145,7 +144,7 @@ class ApiAutomation:
                 json=request.json_data,
                 auth=request.auth or self.auth,
             )
-            
+
             result = {
                 "status": response.status_code,
                 "headers": dict(response.headers),
@@ -153,9 +152,9 @@ class ApiAutomation:
                 "url": str(response.url),
                 "request_count": self._request_count,
             }
-            
+
             content_type = response.headers.get("content-type", "")
-            
+
             if "json" in content_type:
                 try:
                     result["json"] = response.json()
@@ -165,13 +164,13 @@ class ApiAutomation:
                 result["html"] = response.text
             else:
                 result["text"] = response.text
-            
+
             if response.cookies:
                 self.cookies.update(response.cookies)
-            
+
             self._response_history.append(result)
             return result
-            
+
         except httpx.HTTPStatusError as e:
             result = {
                 "status": e.response.status_code,
@@ -203,7 +202,7 @@ class ApiAutomation:
         """Make a DELETE request."""
         return await self.request(ApiRequest(method="DELETE", url=url, **kwargs))
 
-    async def fill_form(self, url: str, form_data: dict[str, Any], 
+    async def fill_form(self, url: str, form_data: dict[str, Any],
                         method: str = "POST") -> dict[str, Any]:
         """Submit form data to a URL."""
         return await self.request(ApiRequest(
@@ -213,25 +212,25 @@ class ApiAutomation:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         ))
 
-    async def upload(self, url: str, files: dict[str, Any], 
+    async def upload(self, url: str, files: dict[str, Any],
                      data: dict[str, Any] | None = None) -> dict[str, Any]:
         """Upload files to a URL."""
         client = await self._get_client()
-        
+
         files_data = {}
         for name, file_info in files.items():
             if isinstance(file_info, tuple):
                 files_data[name] = file_info
             else:
                 files_data[name] = (file_info, "")
-        
+
         response = await client.request(
             method="POST",
             url=url,
             files=files_data,
             data=data or {},
         )
-        
+
         return {
             "status": response.status_code,
             "text": response.text,
@@ -244,23 +243,23 @@ class ApiAutomation:
                     submit_field: str = "submit") -> dict[str, Any]:
         """Perform login to a website."""
         client = await self._get_client()
-        
+
         response = await client.get(url)
         html = response.text
-        
+
         form_action = None
         form_method = "POST"
-        
+
         form_match = re.search(r'<form[^>]*action=["\']([^"\']*)["\'][^>]*method=["\']?([^["\'>\s]*)', html, re.IGNORECASE)
         if form_match:
             form_action = form_match.group(1)
             form_method = form_match.group(2).upper() or "POST"
-        
+
         if not form_action:
             form_action = url
-        
+
         form_data = {username_field: username, password_field: password}
-        
+
         return await self.request(ApiRequest(
             method=form_method,
             url=urljoin(url, form_action),
@@ -284,25 +283,25 @@ class ApiAutomation:
     async def extract_forms(self, html: str) -> list[dict[str, Any]]:
         """Extract all forms from HTML."""
         forms = []
-        
+
         form_pattern = r'<form([^>]*)>(.*?)</form>'
         for form_tag, form_content in re.findall(form_pattern, html, re.DOTALL | re.IGNORECASE):
             form_info = {"action": "", "method": "GET", "fields": {}}
-            
+
             action_match = re.search(r'action=["\']([^"\']*)["\']', form_tag, re.IGNORECASE)
             if action_match:
                 form_info["action"] = action_match.group(1)
-            
+
             method_match = re.search(r'method=["\']([^"\']*)["\']', form_tag, re.IGNORECASE)
             if method_match:
                 form_info["method"] = method_match.group(1).upper()
-            
+
             input_pattern = r'<input[^>]*name=["\']([^"\']*)["\'][^>]*>'
             for name in re.findall(input_pattern, form_content, re.IGNORECASE):
                 form_info["fields"][name] = ""
-            
+
             forms.append(form_info)
-        
+
         return forms
 
     def get_history(self) -> list[dict[str, Any]]:
@@ -335,7 +334,7 @@ class ApiFlow:
         )
 
     @staticmethod
-    async def twitter_post(api: ApiAutomation, text: str, 
+    async def twitter_post(api: ApiAutomation, text: str,
                            bearer_token: str) -> dict[str, Any]:
         """Post a tweet via Twitter API v2."""
         return await api.post(

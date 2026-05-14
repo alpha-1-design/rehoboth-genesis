@@ -8,10 +8,9 @@ from typing import Any
 
 import httpx
 
-from .diff_tool import InteractiveDiffTool
-
 from ..utils import sanitize_error
 from .base import BaseTool, ToolDefinition, ToolRegistry, ToolResult
+from .diff_tool import InteractiveDiffTool
 
 
 class ReadTool(BaseTool):
@@ -146,7 +145,7 @@ class EditTool(BaseTool):
                 content = f.read()
 
             full_old_text = before + old_string + after
-            
+
             if full_old_text not in content:
                 # Provide helpful debugging info if match fails
                 if old_string not in content:
@@ -154,7 +153,7 @@ class EditTool(BaseTool):
                 return ToolResult(
                     success=False,
                     content="",
-                    error=f"Context mismatch. 'old_string' was found, but the surrounding 'before' or 'after' context did not match exactly.",
+                    error="Context mismatch. 'old_string' was found, but the surrounding 'before' or 'after' context did not match exactly.",
                 )
 
             # Check for multiple occurrences of the full context block
@@ -406,7 +405,7 @@ class BashTool(BaseTool):
         context = {"tool": "bash", "command": command}
         violations = safety.check(context)
         proceed, reason = safety.should_proceed(violations)
-        
+
         if not proceed:
             return ToolResult(success=False, content="", error=reason)
 

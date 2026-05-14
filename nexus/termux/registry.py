@@ -1,8 +1,8 @@
 """Register Termux-specific tools."""
 
-from ..tools.base import ToolRegistry
 from ..termux.clipboard import ClipboardTool
 from ..termux.notifications import NotificationTool
+from ..tools.base import ToolRegistry
 
 
 def register_termux_tools(registry: ToolRegistry) -> None:

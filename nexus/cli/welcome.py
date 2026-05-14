@@ -1,8 +1,9 @@
 """Epic Startup for Nexus."""
 
 import os
-import time
 import sys
+import time
+
 
 def clear():
     os.system('clear' if os.name == 'posix' else 'cls')
@@ -22,9 +23,9 @@ def get_logo(config=None):
     # Map to one of the 6 standard terminal colors (31-36)
     color_code = 31 + (hash_val % 6)
     color = f"\033[{color_code}m"
-    
+
     reset = "\033[0m"
-    
+
     return f"""
 {color}      ███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗{reset}
 {color}      ████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝{reset}
@@ -39,10 +40,10 @@ def display_welcome():
     clear()
     from ..config import load_config
     config = load_config()
-    
+
     logo = get_logo(config)
     print(logo)
-    
+
     # ... rest of display_welcome logic ...
 
     cyan = "\033[36m"

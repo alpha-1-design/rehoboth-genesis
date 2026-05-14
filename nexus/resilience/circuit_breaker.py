@@ -6,9 +6,10 @@ States: CLOSED (normal) -> OPEN (failing) -> HALF_OPEN (testing recovery)
 
 import asyncio
 import time
-from dataclasses import dataclass, field
+from collections.abc import Callable, Coroutine
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Callable, Coroutine, TypeVar
+from typing import Any, TypeVar
 
 from ..utils import get_logger
 

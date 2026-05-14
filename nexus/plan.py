@@ -9,11 +9,11 @@ shows confidence/progress/effort for each, and waits for user approval
 before executing.
 """
 
+import json
 import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
-import json
 
 
 class StepPriority(Enum):
@@ -218,7 +218,7 @@ Rules:
                 lines.append(f"       ✗ {step.error}")
 
         lines.append(f"{'─'*60}")
-        lines.append(f"[A]pprove all  [S]kip low-priority  [N]o auto-approve  [Q]uit plan mode  [E]dit step")
+        lines.append("[A]pprove all  [S]kip low-priority  [N]o auto-approve  [Q]uit plan mode  [E]dit step")
         lines.append("")
         return "\n".join(lines)
 

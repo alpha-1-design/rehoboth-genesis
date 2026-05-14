@@ -1,15 +1,15 @@
 """Loading states and progress indicators for plain REPL."""
 
 import sys
-import time
 import threading
-from typing import Generator
+import time
+
 
 class LoadingIndicator:
     """Thread-safe loading indicator for terminal."""
-    
+
     STATES = ["◌", "◐", "◑", "◒", "◓", "◔", "◕", "◖", "◗"]
-    
+
     def __init__(self, message: str = "Working"):
         self.message = message
         self._running = False
@@ -55,13 +55,13 @@ def with_loading(func):
 
 class ProgressTracker:
     """Track multi-step progress."""
-    
+
     def __init__(self, total: int, description: str = ""):
         self.total = total
         self.current = 0
         self.description = description
         self.start_time = time.time()
-    
+
     def step(self, label: str = "") -> None:
         self.current += 1
         pct = self.current / self.total if self.total > 0 else 0
@@ -72,7 +72,7 @@ class ProgressTracker:
             f"\r[{bar}] {pct:.0%}{label_str} ({elapsed:.1f}s)"
         )
         sys.stdout.flush()
-    
+
     def finish(self) -> None:
         elapsed = time.time() - self.start_time
         sys.stdout.write(f"\r{' ' * 60}\rDone in {elapsed:.1f}s\n")

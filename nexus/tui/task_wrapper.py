@@ -3,9 +3,10 @@ Nexus Task Wrapper - Unified Error and Status Management.
 Ensures that all orchestrator tasks report status to the TUI.
 """
 
-import asyncio
 import logging
-from typing import Callable, Any, Awaitable
+from collections.abc import Awaitable
+from typing import Any
+
 
 class OrchestrationTask:
     def __init__(self, tui_app: Any, task_func: Awaitable[Any]):

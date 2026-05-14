@@ -1,25 +1,20 @@
 """Reusable widgets for the Nexus TUI."""
 
-from datetime import datetime
-from typing import Any
 
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.css.match import match
-from textual.css.parse import parse as parse_css
 from textual.reactive import reactive
-from textual.widgets import Static, Input, Label
+from textual.widgets import Input, Static
 
-from .colors import CSS_COLORS
 from .state import (
-    ChatMessage,
-    MessageRole,
-    ToolInfo,
-    ToolStatus,
     AgentInfo,
     AgentStatus,
+    ChatMessage,
+    MessageRole,
     ThinkingStep,
+    ToolInfo,
+    ToolStatus,
 )
 
 
@@ -34,16 +29,16 @@ class ChatMessageWidget(Container):
         timestamp = self.message.timestamp.strftime("%H:%M:%S")
 
         if self.message.role == MessageRole.USER:
-            role_display = f"[bold cyan]USER[/]"
+            role_display = "[bold cyan]USER[/]"
             prefix = "╼"
         elif self.message.role == MessageRole.ASSISTANT:
-            role_display = f"[bold purple]NEXUS[/]"
+            role_display = "[bold purple]NEXUS[/]"
             prefix = "╾"
         elif self.message.role == MessageRole.SYSTEM:
-            role_display = f"[dim]SYST[/]"
+            role_display = "[dim]SYST[/]"
             prefix = "•"
         else:
-            role_display = f"[bold blue]TOOL[/]"
+            role_display = "[bold blue]TOOL[/]"
             prefix = "⚙"
 
         yield Horizontal(
@@ -375,7 +370,7 @@ class StatusBar(Static):
 
 class Heartbeat(Static):
     """Pulsing indicator for Nexus activity."""
-    
+
     def on_mount(self) -> None:
         self.set_interval(0.8, self.update_pulse)
         self.pulse = 0

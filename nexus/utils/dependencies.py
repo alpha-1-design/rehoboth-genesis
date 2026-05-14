@@ -1,10 +1,10 @@
 """Dependency Guard - Handles just-in-time installation of missing libraries."""
 
-import subprocess
-import sys
 import importlib
 import os
-import platform
+import subprocess
+import sys
+
 
 def is_termux() -> bool:
     """Check if we are running in Termux."""
@@ -35,9 +35,9 @@ def ensure_dependency(package_name: str, import_name: str | None = None) -> bool
         bold = "\033[1m"
         reset = "\033[0m"
         dim = "\033[90m"
-        
+
         print(f"\n  {blue}╼{reset} {cyan}nexus/system{reset} {bold}module '{package_name}' missing{reset}")
-        
+
         warning = get_env_warning(package_name)
         if warning:
             print(f"    {yellow}⚠ WARNING:{reset} {warning}")
@@ -45,11 +45,11 @@ def ensure_dependency(package_name: str, import_name: str | None = None) -> bool
             if choice not in ('y', 'yes'):
                 print(f"    {dim}Aborting installation for safety.{reset}")
                 return False
-            
+
             print(f"    {red}Nexus:{reset} {bold}Don't say I didn't warn you...{reset}")
 
         choice = input(f"    {bold}Initialize extension?{reset} (y/N): ").strip().lower()
-        
+
         if choice in ('y', 'yes'):
             print(f"    {dim}Installing {package_name}...{reset}")
             try:

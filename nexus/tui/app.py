@@ -2,48 +2,35 @@
 
 import asyncio
 import os
-import sys
 from datetime import datetime
 from typing import Any
 
 from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
-from textual.css.match import match
-from textual.css.parse import parse as parse_css
-from textual.screen import Screen, ModalScreen
-from textual.widgets import Static, Input, Header, Footer
+from textual.widgets import Footer, Header, Input, Static
 
-from .colors import CSS_COLORS
 from ..agent import get_orchestrator
-from ..agent.orchestrator import AgentOrchestrator
-from .task_wrapper import OrchestrationTask
+from .colors import CSS_COLORS
+from .palette import CommandPalette
 from .state import (
-    TUIState,
-    TUIStateManager,
-    get_state_manager,
-    MessageRole,
     AgentStatus,
-    ToolStatus,
     ChatMessage,
-    ThinkingStep,
-    AgentInfo,
-    ToolInfo,
+    MessageRole,
+    TUIState,
+    get_state_manager,
 )
+from .task_wrapper import OrchestrationTask
 from .widgets import (
+    AgentsPanel,
     ChatMessageWidget,
     ChatPanel,
-    ThinkingPanel,
-    ToolPanel,
-    AgentsPanel,
+    CommandEntered,
     InputBar,
     StatusBar,
-    CommandEntered,
-    Heartbeat,
-    Telemetry,
+    ThinkingPanel,
+    ToolPanel,
 )
-from .palette import CommandPalette
 
 
 class NexusTUI(App):
@@ -98,7 +85,7 @@ class NexusTUI(App):
     def compose(self) -> ComposeResult:
         """Create the layout."""
         yield Header()
-        
+
         # Simple vertical stack to avoid recursion
         yield ChatPanel(id="chat-panel", classes="neural-node")
         yield ThinkingPanel(id="thinking-panel", classes="neural-node")
@@ -107,7 +94,7 @@ class NexusTUI(App):
 
         yield InputBar(id="input-bar")
         yield StatusBar(id="status-bar")
-        
+
         yield Footer()
 
 
@@ -130,6 +117,7 @@ class NexusTUI(App):
         # ... (rest of mount logic) ...
         # Start Shadow Indexer (Proactive Background Learning)
         import threading
+
         from ..memory.shadow import get_shadow_indexer
         self.shadow_indexer = get_shadow_indexer()
         threading.Thread(target=self.shadow_indexer.start, daemon=True).start()
@@ -167,7 +155,7 @@ class NexusTUI(App):
         # Handle agents
         for agent in state.active_agents:
             agents_panel.update_agent(agent)
-            
+
             # Check if agent status is noteworthy
             if agent.status == AgentStatus.THINKING:
                 chat_panel.add_message(ChatMessage(
@@ -193,7 +181,7 @@ class NexusTUI(App):
                 input_bar = self.query_one("#command-input", Input)
                 input_bar.value = command
                 input_bar.focus()
-        
+
         self.push_screen(CommandPalette(), set_command)
 
     def action_clear_screen(self) -> None:
@@ -291,7 +279,7 @@ Agents: {len(state.active_agents)}
         status_bar = self.query_one(StatusBar)
 
         status_bar.model = state.active_model or "nexus-v2"
-        
+
         # Get project info
         import os
         status_bar.project = os.path.basename(os.getcwd())
@@ -396,7 +384,7 @@ Agents: {len(state.active_agents)}
             from ..doctor import NexusDoctor
             doctor = NexusDoctor()
             report = doctor.run_all()
-            
+
             doctor_text = "[bold blue]NEXUS SYSTEM DIAGNOSTICS[/]\n"
             for category, result in report.items():
                 status = "[bold green][OK][/]" if result.get("passed", True) else "[bold red][!][/] "
@@ -405,7 +393,7 @@ Agents: {len(state.active_agents)}
                     from ..utils import format_bytes
                     size = format_bytes(result['total_size_bytes'])
                     doctor_text += f"    -> {result['found_count']} artifacts found ({size} potential savings)\n"
-            
+
             chat_panel.add_message(ChatMessage(
                 role=MessageRole.SYSTEM,
                 content=doctor_text.strip(),
@@ -416,7 +404,7 @@ Agents: {len(state.active_agents)}
         elif cmd == "cleanup":
             from ..doctor import NexusDoctor
             doctor = NexusDoctor()
-            
+
             # First show what will be cleaned
             report = doctor.tactical_cleanup(dry_run=True)
             chat_panel.add_message(ChatMessage(
@@ -424,7 +412,7 @@ Agents: {len(state.active_agents)}
                 content=f"Cleaning {report['potential_savings']} of cache artifacts...",
                 timestamp=datetime.now(),
             ))
-            
+
             # Execute actual cleanup
             result = doctor.tactical_cleanup(dry_run=False)
             chat_panel.add_message(ChatMessage(
@@ -457,10 +445,10 @@ Agents: {len(state.active_agents)}
         self.state_manager.set_busy(True)
 
         try:
+            from ..agent.orchestrator import AgentConfig, AgentOrchestrator
+            from ..memory import get_memory
             from ..providers import get_manager
             from ..tools import get_registry
-            from ..memory import get_memory
-            from ..agent.orchestrator import AgentOrchestrator, AgentConfig
             # ... rest of implementation ...
 
             manager = get_manager()

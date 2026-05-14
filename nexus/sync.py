@@ -15,18 +15,16 @@ Usage:
   /sync connect <type>  — connect external service
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum, auto
-from pathlib import Path
-from typing import Any
 import asyncio
 import hashlib
 import json
 import logging
 import shutil
-import tempfile
-import zipfile
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum, auto
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +105,7 @@ class SyncEngine:
         self.sessions_dir = self.SESSIONS_DIR
         self.sync_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.endpoints: dict[str, SyncEndpoint] = {}
         self._sync_tasks: dict[str, asyncio.Task] = {}
         self._listeners: list[callable] = []
@@ -140,14 +138,14 @@ class SyncEngine:
         """Connect to a sync endpoint."""
         self.endpoints[endpoint.name] = endpoint
         self._save_endpoints()
-        
+
         if endpoint.target == SyncTarget.GITHUB_GIST:
             return self._test_github_gist(endpoint)
         elif endpoint.target == SyncTarget.LOCAL:
             return self._test_local(endpoint)
         elif endpoint.target == SyncTarget.GIT_REMOTE:
             return self._test_git_remote(endpoint)
-        
+
         return True
 
     def _test_github_gist(self, endpoint: SyncEndpoint) -> bool:
@@ -223,7 +221,7 @@ class SyncEngine:
             return self._push_to_local(endpoint, session_id)
         elif endpoint.target == SyncTarget.GIT_REMOTE:
             return self._push_to_git(endpoint, session_id)
-        
+
         return {"success": False, "error": "Unsupported target"}
 
     def pull(self, endpoint_name: str, session_id: str | None = None) -> dict[str, Any]:
@@ -241,15 +239,15 @@ class SyncEngine:
             return self._pull_from_local(endpoint, session_id)
         elif endpoint.target == SyncTarget.GIT_REMOTE:
             return self._pull_from_git(endpoint, session_id)
-        
+
         return {"success": False, "error": "Unsupported target"}
 
     def _push_to_gist(self, endpoint: SyncEndpoint, session_id: str | None = None) -> dict[str, Any]:
         """Push sessions to GitHub Gist."""
         import httpx
-        
+
         files = {}
-        
+
         # Package sessions
         sessions_path = Path.home() / ".nexus" / "memory" / "sessions"
         if sessions_path.exists():
@@ -272,7 +270,7 @@ class SyncEngine:
             return {"success": True, "message": "Nothing to push", "items": 0}
 
         gist_name = endpoint.metadata.get("gist_name", "nexus-sessions")
-        
+
         try:
             # Try to update existing gist
             gist_id = endpoint.metadata.get("gist_id")
@@ -290,7 +288,7 @@ class SyncEngine:
                     json={"files": files, "description": f"Nexus sessions - {datetime.now().date()}", "public": False},
                     timeout=30,
                 )
-            
+
             if resp.status_code in (200, 201):
                 data = resp.json()
                 endpoint.metadata["gist_id"] = data.get("id")
@@ -305,7 +303,7 @@ class SyncEngine:
     def _pull_from_gist(self, endpoint: SyncEndpoint, session_id: str | None = None) -> dict[str, Any]:
         """Pull sessions from GitHub Gist."""
         import httpx
-        
+
         gist_id = endpoint.metadata.get("gist_id")
         if not gist_id:
             return {"success": False, "error": "No Gist ID configured. Push first."}
@@ -316,22 +314,22 @@ class SyncEngine:
                 headers={"Authorization": f"token {endpoint.token}", "Accept": "application/vnd.github+json"},
                 timeout=30,
             )
-            
+
             if resp.status_code == 200:
                 data = resp.json()
                 pulled = 0
                 conflicts = []
-                
+
                 for filename, file_data in data["files"].items():
                     content = file_data["content"]
-                    
+
                     if filename.startswith("session_") and filename.endswith(".json"):
                         dest_name = filename.replace("session_", "").replace(".json", "")
                         dest_path = self.sessions_dir / f"{dest_name}.json"
-                        
+
                         if session_id and session_id not in dest_name:
                             continue
-                        
+
                         # Check for conflict
                         if dest_path.exists():
                             local_hash = hashlib.md5(dest_path.read_bytes()).hexdigest()
@@ -341,21 +339,21 @@ class SyncEngine:
                                 # Backup local
                                 backup_path = dest_path.with_suffix(".conflict.json")
                                 shutil.copy2(dest_path, backup_path)
-                        
+
                         dest_path.write_text(content)
                         pulled += 1
-                    
+
                     elif filename == "config.json":
                         dest = Path.home() / ".nexus" / "config.json"
                         dest.write_text(content)
                         pulled += 1
-                    
+
                     elif filename == "facts.json":
                         dest = Path.home() / ".nexus" / "memory" / "facts.json"
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         dest.write_text(content)
                         pulled += 1
-                
+
                 endpoint.last_sync = datetime.now()
                 self._save_endpoints()
                 return {
@@ -373,10 +371,10 @@ class SyncEngine:
         """Push to local path (USB, shared drive)."""
         if not endpoint.path:
             return {"success": False, "error": "No path configured"}
-        
+
         endpoint.path.mkdir(parents=True, exist_ok=True)
         pushed = 0
-        
+
         sessions_path = Path.home() / ".nexus" / "memory" / "sessions"
         if sessions_path.exists():
             for f in sessions_path.glob("*.json"):
@@ -385,12 +383,12 @@ class SyncEngine:
                 dest = endpoint.path / f.name
                 shutil.copy2(f, dest)
                 pushed += 1
-        
+
         config_path = Path.home() / ".nexus" / "config.json"
         if config_path.exists():
             shutil.copy2(config_path, endpoint.path / "config.json")
             pushed += 1
-        
+
         endpoint.last_sync = datetime.now()
         self._save_endpoints()
         return {"success": True, "items": pushed}
@@ -399,10 +397,10 @@ class SyncEngine:
         """Pull from local path."""
         if not endpoint.path or not endpoint.path.exists():
             return {"success": False, "error": "Path does not exist"}
-        
+
         pulled = 0
         conflicts = []
-        
+
         for f in endpoint.path.glob("session_*.json"):
             if session_id and session_id not in f.stem:
                 continue
@@ -413,7 +411,7 @@ class SyncEngine:
                     shutil.copy2(dest, dest.with_suffix(".conflict.json"))
             shutil.copy2(f, dest)
             pulled += 1
-        
+
         endpoint.last_sync = datetime.now()
         self._save_endpoints()
         return {"success": True, "items": pulled, "conflicts": conflicts}
@@ -421,23 +419,23 @@ class SyncEngine:
     def _push_to_git(self, endpoint: SyncEndpoint, session_id: str | None = None) -> dict[str, Any]:
         """Push to a git remote repository."""
         import subprocess
-        
+
         if not endpoint.path:
             return {"success": False, "error": "No git path configured"}
-        
+
         repo_path = endpoint.path
         work_dir = repo_path / "nexus-sessions"
-        
+
         try:
             # Init or clone
             if not work_dir.exists():
                 if (repo_path / ".git").exists():
-                    subprocess.run(["git", "clone", str(repo_path), str(work_dir)], 
+                    subprocess.run(["git", "clone", str(repo_path), str(work_dir)],
                                   capture_output=True, check=True)
             else:
-                subprocess.run(["git", "-C", str(work_dir), "pull"], 
+                subprocess.run(["git", "-C", str(work_dir), "pull"],
                               capture_output=True, check=True)
-            
+
             # Copy sessions
             sessions_path = Path.home() / ".nexus" / "memory" / "sessions"
             if sessions_path.exists():
@@ -445,13 +443,13 @@ class SyncEngine:
                     if session_id and session_id not in f.name:
                         continue
                     shutil.copy2(f, work_dir / f.name)
-            
+
             # Commit and push
             subprocess.run(["git", "-C", str(work_dir), "add", "."], check=True)
-            subprocess.run(["git", "-C", str(work_dir), "commit", "-m", 
+            subprocess.run(["git", "-C", str(work_dir), "commit", "-m",
                           f"Nexus sync {datetime.now().isoformat()}"], check=True)
             subprocess.run(["git", "-C", str(work_dir), "push"], check=True)
-            
+
             endpoint.last_sync = datetime.now()
             self._save_endpoints()
             return {"success": True, "items": len(list(sessions_path.glob("*.json")) if sessions_path.exists() else [])}
@@ -463,10 +461,10 @@ class SyncEngine:
     def _pull_from_git(self, endpoint: SyncEndpoint, session_id: str | None = None) -> dict[str, Any]:
         """Pull from a git remote repository."""
         import subprocess
-        
+
         if not endpoint.path:
             return {"success": False, "error": "No git path configured"}
-        
+
         work_dir = endpoint.path / "nexus-sessions"
         try:
             if work_dir.exists():
@@ -476,7 +474,7 @@ class SyncEngine:
                     if session_id and session_id not in f.stem:
                         continue
                     shutil.copy2(f, self.sessions_dir / f.name)
-                
+
                 endpoint.last_sync = datetime.now()
                 self._save_endpoints()
                 return {"success": True, "items": len(list(work_dir.glob("session_*.json")))}
@@ -489,7 +487,7 @@ class SyncEngine:
         endpoint = self.endpoints.get(endpoint_name)
         if not endpoint or endpoint_name in self._sync_tasks:
             return
-        
+
         async def _auto_sync_loop():
             while True:
                 await asyncio.sleep(endpoint.sync_interval)
@@ -531,7 +529,7 @@ class SyncEngine:
             if not ep:
                 return {"error": "Endpoint not found"}
             return ep.to_dict()
-        
+
         return {
             "endpoints": {name: ep.to_dict() for name, ep in self.endpoints.items()},
             "auto_sync_active": list(self._sync_tasks.keys()),
@@ -540,12 +538,12 @@ class SyncEngine:
     def format_status(self) -> str:
         """Format sync status for display."""
         lines = ["\n=== Sync Status ==="]
-        
+
         if not self.endpoints:
             lines.append("  No endpoints configured.")
             lines.append("  Connect: /sync connect github-gist|local|git")
             return "\n".join(lines)
-        
+
         for name, ep in self.endpoints.items():
             status_icon = "●" if ep.status == SyncStatus.SYNCED else "○"
             auto_icon = "⟳" if ep.auto_sync else " "
@@ -556,7 +554,7 @@ class SyncEngine:
                 lines.append(f"      URL: {ep.url}")
             if ep.path:
                 lines.append(f"      Path: {ep.path}")
-        
+
         return "\n".join(lines)
 
 

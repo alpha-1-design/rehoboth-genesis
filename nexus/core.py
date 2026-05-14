@@ -1,10 +1,11 @@
 """Nexus Neural Core — The centralized governor of all OS subsystems."""
 
-import asyncio
 from pathlib import Path
+
 from .doctor import NexusDoctor
-from .steward import NexusSteward
 from .memory.shadow import get_shadow_indexer
+from .steward import NexusSteward
+
 
 class NeuralCore:
     """Governs the lifecycle, monitoring, and adaptation of Nexus."""
@@ -20,13 +21,13 @@ class NeuralCore:
         """Proactively initialize all subsystems in a governed order."""
         if not quiet:
             print("[CORE] Activating Neural Governance...")
-        
+
         # 1. Self-Diagnosis (Minimal check)
         # We don't run_all() here to save time on every CLI call
-        
+
         # 2. Knowledge Synchronization (Only if requested or in long session)
         # self.shadow.start() - Moved to lazy start in TUI/REPL
-            
+
         self._is_ready = True
         if not quiet:
             print("[CORE] Governance active. System fully integrated.")

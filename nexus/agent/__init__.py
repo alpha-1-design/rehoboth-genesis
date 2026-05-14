@@ -1,9 +1,9 @@
 """Nexus Agent - Orchestrates AI interaction with tools and memory."""
 
-from .orchestrator import AgentOrchestrator, AgentConfig, Turn
+from ..memory import get_memory
 from ..providers import get_manager
 from ..tools import get_registry
-from ..memory import get_memory
+from .orchestrator import AgentConfig, AgentOrchestrator, Turn
 
 _orchestrator: AgentOrchestrator | None = None
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any
-import time
+
 
 class ThinkingState(Enum):
     IDLE = "idle"
@@ -47,7 +47,7 @@ class ThinkingEngine:
         self._callbacks: list[callable] = []
         self._step_counter = 0
 
-    def start_step(self, state: ThinkingState, title: str, detail: str = "", 
+    def start_step(self, state: ThinkingState, title: str, detail: str = "",
                    tool_name: str | None = None, tool_args: dict | None = None) -> str:
         """Start a new thinking step. Returns step_id."""
         self._step_counter += 1

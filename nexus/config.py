@@ -1,11 +1,10 @@
 """Configuration management for Nexus."""
 
+import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-import json
-import os
-
 
 DEFAULT_CONFIG_DIR = Path.home() / ".nexus"
 DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.json"
@@ -131,13 +130,13 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
         with open(path) as f:
             data = json.load(f)
         return NexusConfig.from_dict(data)
-    
+
     config = NexusConfig()
-    
+
     # Auto-detect Termux
     if os.path.exists("/data/data/com.termux"):
         config.termux_mode = True
-    
+
     # Auto-detect providers from env vars
     if os.environ.get("OPENAI_API_KEY"):
         config.providers["openai"] = ProviderConfig(
@@ -146,7 +145,7 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
             model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
         )
         config.active_provider = "openai"
-    
+
     if os.environ.get("ANTHROPIC_API_KEY"):
         config.providers["anthropic"] = ProviderConfig(
             name="anthropic", provider_type="anthropic",
@@ -155,35 +154,35 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
         )
         if config.active_provider == "openai":
             config.active_provider = "anthropic"
-    
+
     if os.environ.get("GOOGLE_API_KEY"):
         config.providers["google"] = ProviderConfig(
             name="google", provider_type="google",
             api_key=os.environ["GOOGLE_API_KEY"],
             model=os.environ.get("GOOGLE_MODEL", "gemini-2.0-flash"),
         )
-    
+
     if os.environ.get("OLLAMA_HOST"):
         config.providers["ollama"] = ProviderConfig(
             name="ollama", provider_type="ollama",
             base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"),
             model=os.environ.get("OLLAMA_MODEL", "llama3"),
         )
-    
+
     if os.environ.get("GROQ_API_KEY"):
         config.providers["groq"] = ProviderConfig(
             name="groq", provider_type="groq",
             api_key=os.environ["GROQ_API_KEY"],
             model=os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
         )
-    
+
     if os.environ.get("DEEPSEEK_API_KEY"):
         config.providers["deepseek"] = ProviderConfig(
             name="deepseek", provider_type="deepseek",
             api_key=os.environ["DEEPSEEK_API_KEY"],
             model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
         )
-    
+
     if os.environ.get("MISTRAL_API_KEY"):
         config.providers["mistral"] = ProviderConfig(
             name="mistral", provider_type="mistral",
@@ -208,10 +207,10 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
             base_url="https://opencode.ai/zen/go/v1",
             model=os.environ.get("OPENCODE_GO_MODEL", "kimi-k2.5"),
         )
-    
+
     # Auto-save detected config
     save_config(config, path)
-    
+
     return config
 
 

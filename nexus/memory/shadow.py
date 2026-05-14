@@ -6,12 +6,10 @@ project architecture, and user coding patterns.
 
 import asyncio
 import os
-import time
 from pathlib import Path
-from typing import Any, List
 
-from ..memory import Memory, get_memory, ProjectIndexer
-from ..utils import sanitize_error
+from ..memory import Memory, ProjectIndexer, get_memory
+
 
 class ShadowIndexer:
     """Background task that proactively learns about the codebase."""
@@ -53,7 +51,7 @@ class ShadowIndexer:
                 await asyncio.sleep(self._scan_interval)
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception:
                 pass
 
     async def _global_workspace_sweep(self):
@@ -94,27 +92,27 @@ class ShadowIndexer:
         # Pick a random chunk of files to analyze
         import random
         chunk = random.sample(all_files, min(len(all_files), self._files_per_chunk))
-        
+
         for file_info in chunk:
             path = file_info.get("path")
             if not path or not os.path.exists(path):
                 continue
-            
+
             # Analyze patterns (indentation, naming conventions, imports)
             await self._analyze_file_style(path)
 
     async def _analyze_file_style(self, path: str):
         """Infer style facts from a file."""
         try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            
+
             # 1. Indentation Check
             if "\t" in content[:1000]:
                 self.memory.add_fact("coding_style_indent", "tabs", category="coding_patterns", confidence=0.8)
             elif "    " in content[:1000]:
                 self.memory.add_fact("coding_style_indent", "4 spaces", category="coding_patterns", confidence=0.8)
-            
+
             # 2. Naming Conventions (Python specific)
             if path.endswith(".py"):
                 if "_" in content[:2000] and not any(c.isupper() for c in content[:2000] if c.isalpha()):

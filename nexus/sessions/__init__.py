@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..memory import get_memory, Memory, Session
+from ..memory import Memory, Session, get_memory
 
 
 class SessionAutoLoader:
@@ -67,20 +67,20 @@ class SessionAutoLoader:
         """
         filepath = self.sessions_dir / f"{session.id}.json"
         temp_filepath = self.sessions_dir / f"{session.id}.tmp"
-        
+
         data = asdict(session)
         # Convert datetime objects to strings
         if data.get("created_at"):
             data["created_at"] = str(session.created_at)
         if data.get("updated_at"):
             data["updated_at"] = str(session.updated_at)
-        
+
         if crash_safe:
             temp_filepath.write_text(json.dumps(data, indent=2))
             temp_filepath.rename(filepath)
         else:
             filepath.write_text(json.dumps(data, indent=2))
-        
+
         self._last_save_time = datetime.now()
         return str(filepath)
 
@@ -89,7 +89,7 @@ class SessionAutoLoader:
         filepath = self.sessions_dir / f"{session_id}.json"
         if not filepath.exists():
             return None
-        
+
         try:
             data = json.loads(filepath.read_text())
             # Parse datetime strings back
@@ -98,7 +98,7 @@ class SessionAutoLoader:
             if data.get("updated_at"):
                 data["updated_at"] = datetime.fromisoformat(data["updated_at"])
             return Session(**data)
-        except (json.JSONDecodeError, KeyError, TypeError) as e:
+        except (json.JSONDecodeError, KeyError, TypeError):
             return None
 
     def delete_session(self, session_id: str) -> bool:
@@ -113,7 +113,7 @@ class SessionAutoLoader:
         """Start background auto-save task."""
         if self._auto_save_task and not self._auto_save_task.done():
             return
-        
+
         async def _auto_save_loop():
             while True:
                 await asyncio.sleep(self._auto_save_interval)
@@ -122,7 +122,7 @@ class SessionAutoLoader:
                     self.save_session(session)
                 except Exception:
                     pass
-        
+
         self._auto_save_task = asyncio.create_task(_auto_save_loop())
 
     def stop_auto_save(self) -> None:
@@ -136,7 +136,7 @@ class SessionAutoLoader:
         sessions = self.list_recent_sessions(limit=limit)
         if not sessions:
             return "No sessions found."
-        
+
         lines = ["\nRecent Sessions:"]
         for i, s in enumerate(sessions, 1):
             date = s.get("created_at", "")[:10] if s.get("created_at") else "?"
@@ -148,7 +148,7 @@ class SessionAutoLoader:
             lines.append(f"      {msgs} msgs, {tools} tools — {outcome}")
             if preview:
                 lines.append(f"      \"{preview}...\"")
-        
+
         return "\n".join(lines)
 
     def get_resume_prompt(self, session: Session) -> str:
@@ -157,7 +157,7 @@ class SessionAutoLoader:
         tool_count = len(session.tools_used)
         last_msg = session.messages[-1]["content"][:100] if session.messages else ""
         date = session.updated_at.strftime("%Y-%m-%d %H:%M") if session.updated_at else "unknown"
-        
+
         return f"""
 ╔══════════════════════════════════════════════════════════╗
 ║  Session Resume                                          ║
@@ -189,7 +189,7 @@ class ProjectContext:
         if self.context_file.exists():
             try:
                 self._context = json.loads(self.context_file.read_text())
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 self._context = {}
         return self._context
 

@@ -1,4 +1,7 @@
-import os, sys, time, platform, psutil
+import os
+import sys
+
+import psutil
 
 try:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -7,7 +10,7 @@ try:
 except ImportError:
     NEXUS_API_AVAILABLE = False
 
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 app = Flask(__name__, template_folder="templates")
 

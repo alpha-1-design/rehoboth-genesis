@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+
 @dataclass
 class BatteryStatus:
     health: str = "unknown"
@@ -10,11 +11,11 @@ class BatteryStatus:
     temperature: float = 0.0
     voltage: int = 0
     mode: str = "unknown"  # "unspecified", "trickle", "normal", "full"
-    
+
     @property
     def is_charging(self) -> bool:
         return self.plugged not in ("none", "unknown")
-    
+
     @property
     def icon(self) -> str:
         pct = self.percentage
@@ -27,11 +28,11 @@ class BatteryStatus:
         if pct > 20:
             return "🟠"
         return "🔴"
-    
+
     def format(self) -> str:
         charging_str = "🔌 charging" if self.is_charging else "🔋 on battery"
         return f"{self.icon} {self.percentage}% {charging_str}"
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "BatteryStatus":
         return cls(

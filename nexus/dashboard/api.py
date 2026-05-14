@@ -9,16 +9,13 @@ Provides HTTP endpoints for the Flask dashboard to interact with:
 """
 
 import asyncio
-import json
-import time
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any
 
-from ..agent import AgentOrchestrator, AgentConfig
-from ..config import load_config, NexusConfig
-from ..memory import get_memory, VectorMemory, MemoryEntry
-from ..providers import get_manager, ProviderManager, ProviderConfig
+from ..agent import AgentOrchestrator
+from ..config import NexusConfig, load_config
+from ..memory import VectorMemory, get_memory
+from ..providers import ProviderConfig, ProviderManager, get_manager
 from ..skills import SkillsManager
 from ..tools import get_registry
 
@@ -244,7 +241,7 @@ class NexusAPI:
     def get_automation_status(self) -> dict[str, Any]:
         """Get browser/API automation status."""
         try:
-            from ..automation.browser import is_browser_available, BrowserManager
+            from ..automation.browser import BrowserManager, is_browser_available
             browser_available = is_browser_available()
             has_session = BrowserManager.get() is not None
         except Exception:

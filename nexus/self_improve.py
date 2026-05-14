@@ -11,11 +11,11 @@ The improvements/ directory is where Nexus writes code it creates.
 User must approve before any improvement is applied.
 """
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-import json
 
 
 @dataclass
@@ -74,7 +74,7 @@ class SelfImprovementAgent:
     def __init__(self):
         self.improvements_dir = self.IMPROVEMENTS_DIR
         self.improvements_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self._improvements: list[Improvement] = []
         self._preferences: dict[str, Any] = {}
         self._load_preferences()
@@ -130,7 +130,7 @@ class SelfImprovementAgent:
     ) -> Improvement:
         """Create a new improvement suggestion."""
         import uuid
-        
+
         imp = Improvement(
             improvement_id=str(uuid.uuid4())[:12],
             created_at=datetime.now(),
@@ -141,17 +141,17 @@ class SelfImprovementAgent:
             trigger=trigger,
             status="draft",
         )
-        
+
         self._save_improvement(imp)
         self._improvements.append(imp)
-        
+
         return imp
 
     def _save_improvement(self, imp: Improvement) -> None:
         """Save improvement to disk."""
         path = self.improvements_dir / f"{imp.improvement_id}.json"
         path.write_text(json.dumps(imp.to_dict(), indent=2))
-        
+
         # If there's code, also save as a .py file
         if imp.code and imp.status in ("draft", "approved"):
             code_path = self.improvements_dir / f"{imp.improvement_id}.py"
@@ -183,10 +183,10 @@ class SelfImprovementAgent:
         for imp in self._improvements:
             if imp.improvement_id != improvement_id:
                 continue
-            
+
             if imp.status != "approved":
                 return {"success": False, "error": "Improvement not approved"}
-            
+
             if imp.improvement_type == "helper":
                 return self._apply_helper(imp)
             elif imp.improvement_type == "tool":
@@ -195,24 +195,24 @@ class SelfImprovementAgent:
                 return self._apply_rule(imp)
             elif imp.improvement_type == "prompt":
                 return self._apply_prompt(imp)
-            
+
             return {"success": False, "error": "Unknown improvement type"}
-        
+
         return {"success": False, "error": "Improvement not found"}
 
     def _apply_helper(self, imp: Improvement) -> dict[str, Any]:
         """Apply a helper script improvement."""
         helpers_dir = self.improvements_dir / "helpers"
         helpers_dir.mkdir(exist_ok=True)
-        
+
         code_path = helpers_dir / f"{imp.improvement_id}.py"
         code_path.write_text(imp.code)
-        
+
         imp.status = "applied"
         imp.applied_at = datetime.now()
         imp.file_path = code_path
         self._save_improvement(imp)
-        
+
         return {"success": True, "path": str(code_path), "message": f"Helper written to {code_path}"}
 
     def _apply_tool(self, imp: Improvement) -> dict[str, Any]:
@@ -221,15 +221,15 @@ class SelfImprovementAgent:
         # For now, save to improvements/tools/
         tools_dir = self.improvements_dir / "tools"
         tools_dir.mkdir(exist_ok=True)
-        
+
         code_path = tools_dir / f"{imp.improvement_id}.py"
         code_path.write_text(imp.code)
-        
+
         imp.status = "applied"
         imp.applied_at = datetime.now()
         imp.file_path = code_path
         self._save_improvement(imp)
-        
+
         return {"success": True, "path": str(code_path), "message": "Tool written to improvements/tools/"}
 
     def _apply_rule(self, imp: Improvement) -> dict[str, Any]:
@@ -237,12 +237,12 @@ class SelfImprovementAgent:
         # Save as a rules file that gets loaded by the safety engine
         rules_path = self.improvements_dir / f"{imp.improvement_id}_rule.json"
         rules_path.write_text(json.dumps({"rule": imp.description, "code": imp.code}, indent=2))
-        
+
         imp.status = "applied"
         imp.applied_at = datetime.now()
         imp.file_path = rules_path
         self._save_improvement(imp)
-        
+
         return {"success": True, "path": str(rules_path), "message": "Rule applied to safety engine"}
 
     def _apply_prompt(self, imp: Improvement) -> dict[str, Any]:
@@ -250,18 +250,18 @@ class SelfImprovementAgent:
         # Save improved system prompt
         prompts_path = self.improvements_dir / "prompts"
         prompts_path.mkdir(exist_ok=True)
-        
+
         prompt_path = prompts_path / f"{imp.improvement_id}.md"
         prompt_path.write_text(f"# {imp.title}\n\n{imp.description}\n\n```\n{imp.code}\n```")
-        
+
         imp.status = "applied"
         imp.applied_at = datetime.now()
         imp.file_path = prompt_path
         self._save_improvement(imp)
-        
+
         # Update learned preferences
         self.learn_preference("system_prompt", imp.code, context=imp.trigger)
-        
+
         return {"success": True, "path": str(prompt_path), "message": "Prompt improvement saved"}
 
     def generate_reflection_report(self, session_summary: dict[str, Any]) -> str:
@@ -276,18 +276,18 @@ class SelfImprovementAgent:
             "\033[95m═══════════════════════════════════════════════════════════\033[0m",
             "",
         ]
-        
+
         # What we accomplished
         if session_summary.get("tasks_completed"):
             lines.append(f"  ✓ Completed: {session_summary['tasks_completed']} task(s)")
-        
+
         # What failed
         failures = session_summary.get("failures", [])
         if failures:
             lines.append(f"  ✗ Failures: {len(failures)}")
             for f in failures[:3]:
                 lines.append(f"    - {f['tool']}: {f['error'][:50]}...")
-        
+
         # Suggestions
         lines.extend([
             "",
@@ -300,19 +300,19 @@ class SelfImprovementAgent:
             "    📚 Update my lessons from today's failures",
             "",
         ])
-        
+
         # Show existing improvements
         applied = [i for i in self._improvements if i.status == "applied"]
         if applied:
             lines.append(f"  Improvements applied so far: {len(applied)}")
             for i in applied[-3:]:
                 lines.append(f"    • {i.title}")
-        
+
         lines.extend([
             "",
             "  Run self-improvement loop? (yes/no): ",
         ])
-        
+
         return "\n".join(lines)
 
     def run_improvement_loop(
@@ -327,23 +327,23 @@ class SelfImprovementAgent:
         Returns a list of suggested improvements (user must approve).
         """
         suggestions: list[Improvement] = []
-        
+
         if not failures:
             return suggestions
-        
+
         # Analyze failure patterns
         error_types: dict[str, int] = {}
         tool_failures: dict[str, int] = {}
-        
+
         for f in failures:
             et = f.get("error_type", "UNKNOWN")
             error_types[et] = error_types.get(et, 0) + 1
             tn = f.get("tool_name", "unknown")
             tool_failures[tn] = tool_failures.get(tn, 0) + 1
-        
+
         # Generate improvements for frequent failure patterns
         most_common_error = max(error_types, key=error_types.get) if error_types else None
-        
+
         if most_common_error:
             # Write a helper for this error type
             code = self._generate_error_handler(most_common_error, failures)
@@ -356,7 +356,7 @@ class SelfImprovementAgent:
                 trigger=f"error_type:{most_common_error}",
             )
             suggestions.append(imp)
-        
+
         # Generate a project-specific helper if there were many failures
         if len(failures) >= 3:
             project_helper = self._generate_project_helper(failures, task_context)
@@ -369,11 +369,11 @@ class SelfImprovementAgent:
                 trigger=f"context:{task_context[:50]}",
             )
             suggestions.append(imp)
-        
+
         # Save all improvements
         for imp in suggestions:
             self._save_improvement(imp)
-        
+
         return suggestions
 
     def _generate_error_handler(self, error_type: str, failures: list[dict]) -> str:
@@ -441,13 +441,13 @@ async def resilient_request(
     return {"success": False, "error": "Max retries exceeded"}
 ''',
         }
-        
+
         return handlers.get(error_type, f'''"""Auto-generated handler for {error_type}."""\n\n# TODO: Implement {error_type} handler\n''')
 
     def _generate_project_helper(self, failures: list[dict], task_context: str) -> str:
         """Generate a project-specific helper script."""
         tools_used = list(set(f.get("tool_name", "") for f in failures))
-        
+
         return f'''"""Auto-generated project helper for Nexus.
 Generated from session analysis. User should review before relying on this.
 Context: {task_context[:100]}
@@ -497,14 +497,14 @@ def detect_project_root(path: Path | None = None) -> Path | None:
         queue = self.get_improvement_queue()
         if not queue:
             return "  No improvements pending approval."
-        
+
         lines = [f"\n  {len(queue)} improvement(s) awaiting approval:"]
         for imp in queue:
             type_icon = {"helper": "🛠️", "tool": "🔧", "rule": "📋", "prompt": "📝"}.get(imp.improvement_type, "📄")
             lines.append(f"  {type_icon} [{imp.improvement_id}] {imp.title}")
             lines.append(f"      {imp.description[:70]}...")
             lines.append(f"      Use /improve approve {imp.improvement_id} to approve")
-        
+
         return "\n".join(lines)
 
 

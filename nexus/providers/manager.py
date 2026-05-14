@@ -1,15 +1,17 @@
 """Provider manager - handles multiple AI providers with fallback and routing."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
+
+import httpx
 
 from ..config import ProviderConfig
 from .base import (
     PROVIDER_REGISTRY,
     BaseProvider,
     Message,
-    ModelInfo,
     Response,
     StreamChunk,
 )
@@ -109,7 +111,7 @@ class ProviderManager:
 
         last_error = None
         max_retries = 2
-        
+
         for name in provider_names:
             for attempt in range(max_retries + 1):
                 try:
@@ -136,7 +138,6 @@ class ProviderManager:
                     blue = "\033[34m"
                     dim = "\033[90m"
                     reset = "\033[0m"
-                    import traceback
                     print(f"  {blue}╼{reset} {dim}nexus/providers{reset} {cyan}{name}{reset} {dim}failed: {e}{reset}")
                     # traceback.print_exc() # Too verbose for regular use
                     print(f"  {blue}╼{reset} {dim}Switching fallback...{reset}")
@@ -155,10 +156,10 @@ class ProviderManager:
         # Disable streaming when tools are needed (OpenCode Zen has issues with streaming tool calls)
         if tools:
             raise RuntimeError("Streaming with tools not supported, use complete() instead")
-        
+
         active = provider_name or self.active_provider
         provider_names = [active] + [n for n in self.configs.keys() if n != active]
-        
+
         last_error = None
         for name in provider_names:
             try:
@@ -174,7 +175,7 @@ class ProviderManager:
                 reset = "\033[0m"
                 print(f"  {blue}╼{reset} {dim}nexus/providers{reset} {cyan}{name}{reset} {dim}stream failure. Switching fallback...{reset}")
                 continue
-        
+
         # If we get here, all failed
         raise RuntimeError(f"All providers failed to stream. Last error: {last_error}")
 

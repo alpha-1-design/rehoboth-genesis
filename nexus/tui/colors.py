@@ -20,7 +20,7 @@ CSS_COLORS = {
     "system_message": "#64748b",
     "tool_call": "#3b82f6",
     "timestamp": "#475569",
-    
+
     # Glow colors
     "cyan": "#00f2ff",
     "purple": "#7c3aed",

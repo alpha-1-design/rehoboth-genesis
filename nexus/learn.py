@@ -14,11 +14,11 @@ The learning directory: ~/.nexus/learn/
   - improvements/ — self-written code improvements
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-import json
 
 
 @dataclass
@@ -99,7 +99,7 @@ class Lesson:
 ## Solution
 {self.solution}
 
-{f'## Code Snippet\n```python\n{self.code_snippet}\n```' if self.code_snippet else ''}
+{f'## Code Snippet{chr(10)}```python{chr(10)}{self.code_snippet}{chr(10)}```' if self.code_snippet else ''}
 
 ## Examples
 {chr(10).join(f"{i+1}. {e}" for i, e in enumerate(self.examples))}
@@ -121,10 +121,10 @@ class LearningEngine:
         self.lessons_dir = self.learn_dir / "lessons"
         self.patterns_dir = self.learn_dir / "patterns"
         self.improvements_dir = self.learn_dir / "improvements"
-        
+
         for d in [self.failures_dir, self.lessons_dir, self.patterns_dir, self.improvements_dir]:
             d.mkdir(parents=True, exist_ok=True)
-        
+
         self._current_session_failures: list[FailureRecord] = []
         self._session_id: str = ""
         self._lessons_cache: list[Lesson] | None = None
@@ -132,12 +132,12 @@ class LearningEngine:
     def get_session_stats(self, session_id: str) -> dict[str, Any]:
         """Get statistics for a specific session."""
         failures = [f for f in self._current_session_failures if f.session_id == session_id]
-        
+
         # Aggregate tool usage
         tool_usage: dict[str, int] = {}
         for f in failures:
             tool_usage[f.tool_name] = tool_usage.get(f.tool_name, 0) + 1
-            
+
         return {
             "session_id": session_id,
             "failures": [f.to_dict() for f in failures],
@@ -159,7 +159,7 @@ class LearningEngine:
     ) -> FailureRecord:
         """Record a failed operation."""
         import uuid
-        
+
         error_type = self._classify_error(error)
         record = FailureRecord(
             failure_id=str(uuid.uuid4())[:12],
@@ -172,13 +172,13 @@ class LearningEngine:
             context=context,
             attempts=attempts,
         )
-        
+
         self._current_session_failures.append(record)
-        
+
         # Save to disk
         path = self.failures_dir / f"{record.failure_id}.json"
         path.write_text(json.dumps(record.to_dict(), indent=2))
-        
+
         return record
 
     def resolve_failure(self, failure_id: str, resolution: str, resolved_by: str = "user") -> None:
@@ -186,12 +186,12 @@ class LearningEngine:
         path = self.failures_dir / f"{failure_id}.json"
         if not path.exists():
             return
-        
+
         data = json.loads(path.read_text())
         data["resolution"] = resolution
         data["resolved_by"] = resolved_by
         path.write_text(json.dumps(data, indent=2))
-        
+
         # Update in-memory record if present
         for f in self._current_session_failures:
             if f.failure_id == failure_id:
@@ -202,7 +202,7 @@ class LearningEngine:
     def _classify_error(self, error: str) -> str:
         """Classify an error into a category."""
         error_lower = error.lower()
-        
+
         if any(x in error_lower for x in ["not found", "no such file", "does not exist", "404"]):
             return "NOT_FOUND"
         elif any(x in error_lower for x in ["permission denied", "access denied", "forbidden", "401", "403"]):
@@ -229,16 +229,16 @@ class LearningEngine:
         For now, it creates a template-based lesson.
         """
         import uuid
-        
+
         trigger_conditions = [
             f"tool:{failure.tool_name}",
             f"error_type:{failure.error_type}",
         ]
-        
+
         # Extract keywords from error
         words = failure.error.split()
         trigger_conditions.extend(w for w in words if len(w) > 4 and w.isalpha())
-        
+
         lesson = Lesson(
             lesson_id=str(uuid.uuid4())[:12],
             created_at=datetime.now(),
@@ -250,15 +250,15 @@ class LearningEngine:
             examples=[f"Failed with args: {json.dumps(failure.args)}"],
             source_failures=[failure.failure_id],
         )
-        
+
         # Save lesson
         path = self.lessons_dir / f"{lesson.lesson_id}.json"
         path.write_text(json.dumps(lesson.to_dict(), indent=2))
-        
+
         # Also save as markdown
         md_path = self.lessons_dir / f"{lesson.lesson_id}.md"
         md_path.write_text(lesson.to_markdown())
-        
+
         failure.lesson_id = lesson.lesson_id
         return lesson
 
@@ -282,7 +282,7 @@ class LearningEngine:
             "RESOURCE_ERROR": f"Reduce scope or batch size for `{failure.tool_name}`. "
                              "Consider processing in smaller chunks.",
         }
-        return solutions.get(failure.error_type, 
+        return solutions.get(failure.error_type,
             f"Review the error message and adjust the approach for `{failure.tool_name}`.")
 
     def _suggest_code(self, failure: FailureRecord) -> str | None:
@@ -294,7 +294,7 @@ class LearningEngine:
         logger.warning(f"Target {{target}} not found")
         return None
     return await {failure.tool_name}(...)'''
-        
+
         if failure.error_type == "NETWORK_TIMEOUT":
             return f'''import asyncio
 
@@ -307,21 +307,21 @@ async def resilient_{failure.tool_name}(...):
                 raise
             await asyncio.sleep(2 ** attempt)  # exponential backoff
     return None'''
-        
+
         if failure.error_type == "RATE_LIMIT":
             return f'''import asyncio
 
 async def rate_limited_{failure.tool_name}(...):
     async with rate_limiter:
         return await {failure.tool_name}(...)'''
-        
+
         return None
 
     def get_applicable_lessons(self, task: str, tool_name: str | None = None) -> list[Lesson]:
         """Get lessons applicable to the current task."""
         lessons = self._load_all_lessons()
         applicable = []
-        
+
         task_lower = task.lower()
         for lesson in lessons:
             # Check if any trigger condition matches
@@ -335,14 +335,14 @@ async def rate_limited_{failure.tool_name}(...):
                 if any(w in task_lower for w in trigger_lower.split()):
                     applicable.append(lesson)
                     break
-        
+
         return applicable
 
     def _load_all_lessons(self) -> list[Lesson]:
         """Load all lessons from disk."""
         if self._lessons_cache is not None:
             return self._lessons_cache
-        
+
         lessons = []
         for f in self.lessons_dir.glob("*.json"):
             try:
@@ -351,7 +351,7 @@ async def rate_limited_{failure.tool_name}(...):
                 lessons.append(Lesson(**data))
             except Exception:
                 pass
-        
+
         lessons.sort(key=lambda l: l.success_count / max(1, l.success_count + l.failure_count), reverse=True)
         self._lessons_cache = lessons
         return lessons
@@ -362,10 +362,10 @@ async def rate_limited_{failure.tool_name}(...):
         Returns a summary of what was learned.
         """
         failures = [f for f in self._current_session_failures if f.session_id == session_id]
-        
+
         if not failures:
             return {"failures": 0, "lessons_created": 0, "outcome": outcome}
-        
+
         lessons_created = 0
         for failure in failures:
             if not failure.resolution:
@@ -373,9 +373,9 @@ async def rate_limited_{failure.tool_name}(...):
                 failure.resolved_by = "session_end"
             lesson = self.synthesize_lesson(failure)
             lessons_created += 1
-        
+
         self._lessons_cache = None  # Invalidate cache
-        
+
         return {
             "failures": len(failures),
             "lessons_created": lessons_created,
@@ -387,7 +387,7 @@ async def rate_limited_{failure.tool_name}(...):
         """Get learning statistics."""
         failures = list(self.failures_dir.glob("*.json"))
         lessons = list(self.lessons_dir.glob("*.json"))
-        
+
         error_types: dict[str, int] = {}
         for f in failures:
             try:
@@ -396,9 +396,9 @@ async def rate_limited_{failure.tool_name}(...):
                 error_types[et] = error_types.get(et, 0) + 1
             except Exception:
                 pass
-        
+
         resolved = sum(1 for f in failures if json.loads(f.read_text()).get("resolution"))
-        
+
         return {
             "total_failures": len(failures),
             "total_lessons": len(lessons),
@@ -411,28 +411,28 @@ async def rate_limited_{failure.tool_name}(...):
     def format_summary(self) -> str:
         """Format learning stats for display."""
         stats = self.get_stats()
-        
+
         lines = ["\n=== Nexus Learning Stats ==="]
         lines.append(f"  Failures recorded: {stats['total_failures']}")
         lines.append(f"  Lessons learned: {stats['total_lessons']}")
         lines.append(f"  Resolution rate: {stats['resolution_rate']:.0%}")
-        
+
         if stats["errors_by_type"]:
             lines.append("  Top error types:")
             sorted_errors = sorted(stats["errors_by_type"].items(), key=lambda x: -x[1])[:5]
             for et, count in sorted_errors:
                 lines.append(f"    {et}: {count}")
-        
+
         return "\n".join(lines)
 
     def ask_reflection(self) -> str:
         """Build the reflection prompt shown to user after work."""
         stats = self.get_stats()
         failures = self._current_session_failures
-        
+
         if not failures:
             return ""
-        
+
         lines = [
             "\n\033[93m═══════════════════════════════════════════════════════════\033[0m",
             "\033[93m║  🎓 LEARNING REVIEW — Want me to reflect on this session?\033[[0m",
@@ -446,17 +446,17 @@ async def rate_limited_{failure.tool_name}(...):
             "    4. Suggest code improvements for my own tools",
             "",
         ]
-        
+
         if failures:
             lines.append("  Failures this session:")
             for f in failures[-3:]:
                 lines.append(f"    ✗ {f.tool_name}: {f.error[:60]}...")
-        
+
         lines.extend([
             "",
             "  Run reflection loop? (yes/no/silent): ",
         ])
-        
+
         return "\n".join(lines)
 
 

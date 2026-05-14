@@ -4,11 +4,11 @@ Provides session management, facts storage, and project context.
 """
 
 import json
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-import uuid
 
 
 @dataclass
@@ -164,7 +164,7 @@ class Memory:
                 fact_data = project_context["facts"].get(key)
                 if fact_data:
                     return fact_data.get("value")
-        
+
         fact = self._facts.get(key)
         return fact.value if fact else None
 
@@ -231,7 +231,7 @@ class Memory:
         return "\n".join(parts) if parts else "(no context stored)"
 
 
-from .vectors import VectorMemory, MemoryEntry, VectorMemoryBackend, SimpleKeywordBackend
+from .vectors import MemoryEntry, SimpleKeywordBackend, VectorMemory, VectorMemoryBackend
 
 # Global memory instance
 _memory: Memory | None = None

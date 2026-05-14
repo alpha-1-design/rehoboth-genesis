@@ -9,10 +9,11 @@ Rules are executed in strict order:
   6. ROLLBACK on ERROR — auto-rollback if critical operations fail
 """
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable
-import re
+from typing import Any
 
 
 class RuleLevel(Enum):
@@ -337,7 +338,7 @@ class SafetyEngine:
                     continue
 
             if rule.matches(context):
-                sev = "BLOCK" if (rule.level == RuleLevel.BLOCK or 
+                sev = "BLOCK" if (rule.level == RuleLevel.BLOCK or
                                   (self._strict_mode and rule.level == RuleLevel.WARN)) else rule.level.name
                 violation = RuleViolation(
                     rule=rule,
@@ -395,12 +396,12 @@ class SafetyEngine:
         """Get a summary of all violations this session."""
         if not self._violations:
             return "No rule violations."
-        
+
         lines = [f"Total violations: {len(self._violations)}"]
         by_level = {}
         for v in self._violations:
             by_level.setdefault(v.severity, []).append(v.rule.name)
-        
+
         for level, rules in by_level.items():
             lines.append(f"  [{level}]: {', '.join(set(rules))}")
         return "\n".join(lines)
@@ -430,7 +431,7 @@ class SafetyEngine:
         """Render violations as a human-readable string."""
         if not violations:
             return "\033[92m✓ All safety checks passed\033[0m"
-        
+
         lines = []
         for v in violations:
             icon = "🚫" if v.severity == "BLOCK" else "⚠️" if v.severity == "WARN" else "ℹ️"
@@ -441,7 +442,7 @@ class SafetyEngine:
                 lines.append(f"  \033[90mPath: {v.context['path']}\033[0m")
             if v.fix_suggestion:
                 lines.append(f"  \033[96mFix: {v.fix_suggestion}\033[0m")
-        
+
         return "\n".join(lines)
 
 

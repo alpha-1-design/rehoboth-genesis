@@ -83,7 +83,7 @@ class BrowserFillFormTool(BaseTool):
 
     async def execute(self, fields: list[dict[str, Any]], **kwargs) -> ToolResult:
         try:
-            from ..automation.browser import FormField, BrowserManager
+            from ..automation.browser import BrowserManager, FormField
 
             browser = BrowserManager.get()
             if not browser:
@@ -489,6 +489,7 @@ class ExtractFormsTool(BaseTool):
     async def execute(self, html: str, **kwargs) -> ToolResult:
         try:
             import json
+
             from bs4 import BeautifulSoup
 
             soup = BeautifulSoup(html, "html.parser")

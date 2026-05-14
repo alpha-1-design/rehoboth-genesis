@@ -5,13 +5,13 @@ when running on Android/Termux. Gracefully degrades on other platforms.
 """
 
 from .api import TermuxAPI, get_termux_api
+from .battery import BatteryStatus
 from .clipboard import ClipboardTool
 from .notifications import NotificationTool
-from .battery import BatteryStatus
 
 __all__ = [
     "TermuxAPI",
-    "get_termux_api", 
+    "get_termux_api",
     "ClipboardTool",
     "NotificationTool",
     "BatteryStatus",

@@ -1,12 +1,12 @@
 """Task Orchestrator - decomposes complex tasks into ordered execution plans."""
 
-import asyncio
 import re
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 from ..utils import get_logger
 
@@ -331,12 +331,12 @@ class SimpleDecomposer(BaseDecomposer):
             if tool == "pnpm": return "pnpm install"
             if tool == "yarn": return "yarn install"
             return f"{tool} install"
-        
+
         if "npm" in text_lower or "node" in text_lower: return "npm install"
         if "pip" in text_lower: return "pip install"
         if "cargo" in text_lower or "rust" in text_lower: return "cargo build"
         if "go" in text_lower: return "go mod tidy"
-        
+
         return context.get("install_cmd", "pip install -r requirements.txt")
 
     def _decompose_multi_action(self, task: str, context: dict) -> list[ExecutionStep]:
@@ -396,19 +396,19 @@ class SimpleDecomposer(BaseDecomposer):
                 if run_with_m:
                     tool = run_with_m.group(1).strip()
                     cmd = f"{tool} {path}" if path != "unknown" else tool
-                
+
                 if not cmd and test_cmd:
                     cmd = test_cmd
-                    
+
                 if not cmd and wrote and path != "unknown":
                     if path.endswith(".py"): cmd = f"python {path}"
                     elif path.endswith(".js"): cmd = f"node {path}"
                     elif path.endswith(".sh"): cmd = f"bash {path}"
                     elif path.endswith(".ts"): cmd = f"tsc && node {path.replace('.ts','.js')}"
-                
+
                 if not cmd and ("node" in task_lower or "npm" in task_lower): cmd = "npm start"
                 if not cmd: cmd = "pytest -v" if "pytest" in task_lower else f"python {path}" if path.endswith(".py") else ""
-                
+
                 if cmd:
                     sid = self._next_id()
                     deps = [StepDependency(prev_id)] if prev_id else []

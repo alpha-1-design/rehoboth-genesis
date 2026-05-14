@@ -1,8 +1,8 @@
 """Skill Discovery - Nexus explores its own environment and registers capabilities."""
 
 import shutil
-import os
 from pathlib import Path
+
 
 class SkillDiscoverer:
     """Probes the environment to discover and suggest new skills."""
@@ -26,7 +26,7 @@ class SkillDiscoverer:
             if shutil.which(tool):
                 if not (self.skills_dir / f"{skill}.py").exists():
                     discovered.append((tool, skill))
-        
+
         if discovered:
             print(f"[!] Found new capabilities: {[d[0] for d in discovered]}")
             for tool, skill in discovered:
