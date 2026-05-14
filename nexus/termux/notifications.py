@@ -27,8 +27,7 @@ class NotificationTool(BaseTool):
             },
         )
 
-    async def execute(self, title: str, message: str, id: int = 0,
-                     sound: bool = True, **kwargs) -> ToolResult:
+    async def execute(self, title: str, message: str, id: int = 0, sound: bool = True, **kwargs) -> ToolResult:
         from ..termux import get_termux_api
 
         api = get_termux_api()

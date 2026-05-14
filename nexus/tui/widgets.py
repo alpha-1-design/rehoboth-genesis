@@ -1,6 +1,5 @@
 """Reusable widgets for the Nexus TUI."""
 
-
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -333,6 +332,7 @@ class InputBar(Container):
 
 class CommandEntered(events.Message):
     """Message sent when user enters a command."""
+
     def __init__(self, command: str):
         super().__init__()
         self.command = command
@@ -380,6 +380,7 @@ class Heartbeat(Static):
         self.pulse = (self.pulse + 1) % len(self.chars)
         self.update(f"[bold cyan]NEURAL:{self.chars[self.pulse]}[/]")
 
+
 class Telemetry(Static):
     """Live status display for system and steward metrics."""
 
@@ -389,5 +390,6 @@ class Telemetry(Static):
 
     def update_metrics(self) -> None:
         import random
+
         self._load = max(1, min(99, self._load + random.randint(-5, 5)))
         self.update(f"[telemetry-item]MESH-LOAD: {self._load}% | STEWARD: READY[/]")

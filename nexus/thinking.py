@@ -19,6 +19,7 @@ class ThinkingState(Enum):
     COMPLETE = "complete"
     ERROR = "error"
 
+
 @dataclass
 class ThinkingStep:
     step_id: str
@@ -38,6 +39,7 @@ class ThinkingStep:
     def is_running(self) -> bool:
         return self.finished_at is None
 
+
 class ThinkingEngine:
     """Captures and formats agent thinking for display."""
 
@@ -47,8 +49,7 @@ class ThinkingEngine:
         self._callbacks: list[callable] = []
         self._step_counter = 0
 
-    def start_step(self, state: ThinkingState, title: str, detail: str = "",
-                   tool_name: str | None = None, tool_args: dict | None = None) -> str:
+    def start_step(self, state: ThinkingState, title: str, detail: str = "", tool_name: str | None = None, tool_args: dict | None = None) -> str:
         """Start a new thinking step. Returns step_id."""
         self._step_counter += 1
         step_id = f"step_{self._step_counter}"
@@ -145,6 +146,7 @@ class ThinkingEngine:
 
 # Global singleton
 _thinking_engine: ThinkingEngine | None = None
+
 
 def get_thinking_engine() -> ThinkingEngine:
     global _thinking_engine

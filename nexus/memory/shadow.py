@@ -20,7 +20,7 @@ class ShadowIndexer:
         self.running = False
         self._task: asyncio.Task | None = None
         self._scan_interval = 300  # Scan every 5 minutes
-        self._files_per_chunk = 5   # Process 5 files at a time to stay lightweight
+        self._files_per_chunk = 5  # Process 5 files at a time to stay lightweight
 
     def start(self):
         """Start the shadow indexing process."""
@@ -76,7 +76,7 @@ class ShadowIndexer:
         # Example: If Python but no Ruff config
         projects = self.memory.get_fact("workspace_projects")
         if projects and isinstance(projects.value, list):
-            for p in projects.value[:3]: # Only analyze first 3
+            for p in projects.value[:3]:  # Only analyze first 3
                 if not os.path.exists(os.path.join(p, "pyproject.toml")):
                     insights.append(f"Project '{os.path.basename(p)}' is missing a pyproject.toml. Should we standardize it?")
 
@@ -91,6 +91,7 @@ class ShadowIndexer:
 
         # Pick a random chunk of files to analyze
         import random
+
         chunk = random.sample(all_files, min(len(all_files), self._files_per_chunk))
 
         for file_info in chunk:
@@ -129,8 +130,10 @@ class ShadowIndexer:
         except Exception:
             pass
 
+
 # Global instance
 _shadow_indexer: ShadowIndexer | None = None
+
 
 def get_shadow_indexer() -> ShadowIndexer:
     global _shadow_indexer

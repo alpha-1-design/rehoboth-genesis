@@ -1,4 +1,3 @@
-
 import click
 
 from ..config import NexusConfig, ProviderConfig, save_config
@@ -34,7 +33,7 @@ class OnboardingManager:
     def _display_intro(self):
         click.echo("\n" + "✧" * 60)
         # Use personality for the greeting to make it feel human
-        greeting = self.personality.greet() if hasattr(self.personality, 'greet') else "Welcome to Nexus."
+        greeting = self.personality.greet() if hasattr(self.personality, "greet") else "Welcome to Nexus."
         click.echo(f"\033[1;36m{greeting}\033[0m")
         click.echo("\033[90mI'm here to help you build the future. Let's get you synchronized.\033[0m")
         click.echo("✧" * 60 + "\n")
@@ -55,7 +54,7 @@ class OnboardingManager:
             click.echo(f"     \033[90m{desc}\033[0m")
 
         choice = click.prompt("\nChoose your provider", type=click.IntRange(1, len(options)), default=1)
-        return options[choice-1][0]
+        return options[choice - 1][0]
 
     def _handle_api_key(self, provider: str) -> str:
         if provider == "ollama":

@@ -6,6 +6,7 @@ import psutil
 try:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from nexus.dashboard.api import get_api
+
     NEXUS_API_AVAILABLE = True
 except ImportError:
     NEXUS_API_AVAILABLE = False
@@ -194,5 +195,3 @@ def manifest():
 @app.route("/sw.js")
 def service_worker():
     return send_from_directory(app.template_folder, "sw.js", mimetype="application/javascript")
-
-

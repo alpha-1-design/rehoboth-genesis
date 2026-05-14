@@ -56,6 +56,7 @@ class REPL:
 
         # Initialize project indexing for Neural Layers
         from ..memory import ProjectIndexer
+
         self.indexer = ProjectIndexer(self.memory)
 
         # Register thinking callback
@@ -94,12 +95,14 @@ class REPL:
                 enabled=True,
             )
 
-            prov = PROVIDER_REGISTRY["openai"]({
-                "api_key": "",
-                "base_url": "https://opencode.ai/zen/v1",
-                "model": "minimax-m2.5-free",
-                "timeout": 120,
-            })
+            prov = PROVIDER_REGISTRY["openai"](
+                {
+                    "api_key": "",
+                    "base_url": "https://opencode.ai/zen/v1",
+                    "model": "minimax-m2.5-free",
+                    "timeout": 120,
+                }
+            )
             await prov.complete([Message(role="user", content="ping")], None)
 
             # Works — save to config
@@ -139,12 +142,13 @@ class REPL:
                 else:
                     print("Starting fresh session.")
             except (EOFError, KeyboardInterrupt):
-                    print("Starting fresh session.")
+                print("Starting fresh session.")
 
     def _check_tool_safety(self, tool_name: str, arguments: dict) -> tuple[bool, ToolResult | None]:
         """Check tool call against safety rules with visual scanning effect."""
         # Visual "Security Scan" effect
         import random
+
         cyan = "\033[36m"
         dim = "\033[90m"
         reset = "\033[0m"
@@ -199,6 +203,7 @@ class REPL:
     def _get_histfile(self) -> str:
         """Get the history file path."""
         from pathlib import Path
+
         return str(Path.home() / ".nexus" / ".history")
 
     def _save_history(self) -> None:
@@ -212,6 +217,7 @@ class REPL:
     async def _llm_voice_callback(self, text: str) -> str:
         """Send voice input to LLM and return response text."""
         from ..providers import Message
+
         messages = [Message(role="system", content=self._get_system_prompt())] + self.messages
         messages.append(Message(role="user", content=text))
 
@@ -223,10 +229,14 @@ class REPL:
                 tool = self.registry.get(tc.name)
                 if tool:
                     result = await tool.execute(**tc.arguments)
-                    messages.append(Message(
-                        role="tool", content=result.content,
-                        name=tc.name, tool_call_id=tc.id,
-                    ))
+                    messages.append(
+                        Message(
+                            role="tool",
+                            content=result.content,
+                            name=tc.name,
+                            tool_call_id=tc.id,
+                        )
+                    )
 
             response = await self.manager.complete(messages, tools)
             self.messages.append(Message(role="user", content=text))
@@ -399,9 +409,7 @@ When using tools, always provide clear feedback about what you're doing.
                                         result.content = f"[REJECTED BY FIRE] The work was performed, but it failed the integrity check:\n{validation_error}\n\n[RECOVERY] I have detected an impurity in the logic. You must fix this error before proceeding."
 
                                 if not result.success:
-                                    result.content = await self._handle_tool_failure(
-                                        tool_call.name, tool_call.arguments, result.error or result.content
-                                    )
+                                    result.content = await self._handle_tool_failure(tool_call.name, tool_call.arguments, result.error or result.content)
                             tool_results.append((tool_call, result))
                             if not result.success:
                                 self.learning.record_failure(
@@ -422,12 +430,14 @@ When using tools, always provide clear feedback about what you're doing.
                             print(f"{prefix}{preview}..." if len(result.content) > 200 else f"{prefix}{result.content}")
 
                             # Add tool result as message
-                            messages.append(Message(
-                                role="tool",
-                                content=result.content,
-                                name=tool_call.name,
-                                tool_call_id=tool_call.id,
-                            ))
+                            messages.append(
+                                Message(
+                                    role="tool",
+                                    content=result.content,
+                                    name=tool_call.name,
+                                    tool_call_id=tool_call.id,
+                                )
+                            )
 
                             # Record tool usage
                             if chunk.tool_call.name not in self.session.tools_used:
@@ -438,12 +448,14 @@ When using tools, always provide clear feedback about what you're doing.
                 # If tools were called, send results back and get final response
                 if tool_results:
                     for tc, res in tool_results:
-                        messages.append(Message(
-                            role="tool",
-                            content=res.content,
-                            name=tc.name,
-                            tool_call_id=tc.id,
-                        ))
+                        messages.append(
+                            Message(
+                                role="tool",
+                                content=res.content,
+                                name=tc.name,
+                                tool_call_id=tc.id,
+                            )
+                        )
                     final_response = await self.manager.complete(messages, tools)
                     final_content = final_response.content
                     if print_result and final_content:
@@ -480,9 +492,7 @@ When using tools, always provide clear feedback about what you're doing.
 
                             result = await tool.execute(**tool_call.arguments)
                             if not result.success:
-                                result.content = await self._handle_tool_failure(
-                                    tool_call.name, tool_call.arguments, result.error or result.content
-                                )
+                                result.content = await self._handle_tool_failure(tool_call.name, tool_call.arguments, result.error or result.content)
                         if not result.success:
                             self.learning.record_failure(
                                 tool_name=tool_call.name,
@@ -492,19 +502,17 @@ When using tools, always provide clear feedback about what you're doing.
                             )
 
                         # Add assistant's tool_call message to history
-                        messages.append(Message(
-                            role="assistant",
-                            content=response.content,
-                            tool_calls=[tool_call]
-                        ))
+                        messages.append(Message(role="assistant", content=response.content, tool_calls=[tool_call]))
 
                         # Add tool result message
-                        messages.append(Message(
-                            role="tool",
-                            content=result.content,
-                            name=tool_call.name,
-                            tool_call_id=tool_call.id,
-                        ))
+                        messages.append(
+                            Message(
+                                role="tool",
+                                content=result.content,
+                                name=tool_call.name,
+                                tool_call_id=tool_call.id,
+                            )
+                        )
 
                 # Get final response (may be after tool results)
                 response = await self.manager.complete(messages, tools)
@@ -528,6 +536,7 @@ When using tools, always provide clear feedback about what you're doing.
     def _get_proactive_insight(self) -> str | None:
         """Fetch a proactive suggestion from the Shadow Architect."""
         import random
+
         insights_fact = self.memory.get_fact("proactive_insights")
         if insights_fact and isinstance(insights_fact.value, list) and insights_fact.value:
             return random.choice(insights_fact.value)
@@ -591,6 +600,7 @@ When using tools, always provide clear feedback about what you're doing.
     def _show_kinetic_stream(self, path: str) -> None:
         """Visual effect for data streaming into a file."""
         import random
+
         green = "\033[32m"
         dim = "\033[90m"
         reset = "\033[0m"
@@ -620,6 +630,7 @@ When using tools, always provide clear feedback about what you're doing.
         if path.endswith(".py"):
             try:
                 import ast
+
                 with open(path, encoding="utf-8") as f:
                     ast.parse(f.read())
             except SyntaxError as e:
@@ -631,6 +642,7 @@ When using tools, always provide clear feedback about what you're doing.
         if path.endswith(".py"):
             try:
                 import ast
+
                 with open(path, encoding="utf-8") as f:
                     ast.parse(f.read())
             except SyntaxError as e:
@@ -642,6 +654,7 @@ When using tools, always provide clear feedback about what you're doing.
             # 2. JSON Validation
             try:
                 import json
+
                 with open(path, encoding="utf-8") as f:
                     json.load(f)
             except Exception as e:
@@ -651,6 +664,7 @@ When using tools, always provide clear feedback about what you're doing.
             # 3. YAML Validation
             try:
                 import yaml
+
                 with open(path, encoding="utf-8") as f:
                     yaml.safe_load(f)
             except Exception as e:
@@ -663,6 +677,7 @@ When using tools, always provide clear feedback about what you're doing.
     async def _handle_tool_failure(self, tool_name: str, arguments: dict, error: str) -> str:
         """Perform automatic diagnostics and recovery hints for tool failures."""
         import os
+
         hint = f"Error: {error}"
 
         # 1. Edit Tool Context Mismatch
@@ -678,8 +693,8 @@ When using tools, always provide clear feedback about what you're doing.
                     lines = content.splitlines()
                     for i, line in enumerate(lines):
                         if old_string in line:
-                            context_block = "\n".join(lines[max(0, i-2):min(len(lines), i+3)])
-                            hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i+1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
+                            context_block = "\n".join(lines[max(0, i - 2) : min(len(lines), i + 3)])
+                            hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i + 1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
                             break
                 else:
                     hint += "\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
@@ -737,6 +752,7 @@ Available commands:
 
         elif cmd == "safety":
             from ..safety import SafetyMode
+
             if not args:
                 current = self.safety.get_mode().name
                 print(f"Current safety mode: \033[96m{current}\033[0m")
@@ -783,7 +799,7 @@ Available commands:
             for i, msg in enumerate(self.messages[-10:]):
                 role = msg.role.upper()
                 content = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
-                print(f"{i+1}. [{role}] {content}")
+                print(f"{i + 1}. [{role}] {content}")
             return True
 
         elif cmd == "tools":
@@ -910,6 +926,7 @@ Available commands:
 
         elif cmd == "skills":
             from ..skills import SkillsManager
+
             sm = SkillsManager()
             sm.load_all()
             print("\nAvailable skills:")
@@ -921,6 +938,7 @@ Available commands:
         elif cmd == "skill":
             if args:
                 from ..skills import SkillsManager
+
                 sm = SkillsManager()
                 sm.load_all()
                 if sm.activate(args):
@@ -1004,6 +1022,7 @@ Available commands:
 
         elif cmd == "plugin":
             from ..plugins import get_plugin_manager
+
             pm = get_plugin_manager()
             parts = args.split(maxsplit=1) if args else []
             subcmd = parts[0] if parts else "list"
@@ -1097,8 +1116,8 @@ Available commands:
                     print(f"    Success: {rate:.0%} | Triggers: {', '.join(l.trigger_conditions[:2])}")
             elif sub == "failures":
                 import json
-                failures = sorted(self.learning.failures_dir.glob("*.json"),
-                                 key=lambda f: f.stat().st_mtime, reverse=True)[:5]
+
+                failures = sorted(self.learning.failures_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)[:5]
                 for f in failures:
                     d = json.loads(f.read_text())
                     print(f"  [{d['timestamp'][:16]}] {d['tool_name']} — {d['error_type']}")
@@ -1294,17 +1313,16 @@ Available commands:
         if summary.get("failures", 0) > 0:
             print(f"\n{self.personality.reflection_ask()}")
 
-
     def _on_team_message(self, msg) -> None:
         """Handle incoming team messages."""
         if msg.msg_type == "system":
             print(f"\n[team] {msg.content}")
         else:
             color_map = {
-                "planner": "\033[94m",    # blue
-                "coder": "\033[92m",       # green
-                "reviewer": "\033[93m",    # yellow
-                "tester": "\033[95m",      # magenta
+                "planner": "\033[94m",  # blue
+                "coder": "\033[92m",  # green
+                "reviewer": "\033[93m",  # yellow
+                "tester": "\033[95m",  # magenta
                 "researcher": "\033[96m",  # cyan
             }
             color = color_map.get(msg.agent_name.split("_")[0] if "_" in msg.agent_name else "", "\033[92m")
@@ -1411,9 +1429,9 @@ Available commands:
                 print(f"    {dim}processed {len(lines)} lines from segment{reset}")
                 # Show first 2 lines
                 for line in lines[:2]:
-                    print(f"    {dim}│{reset} {line[:term_width-10]}")
+                    print(f"    {dim}│{reset} {line[: term_width - 10]}")
                 if len(lines) > 2:
-                    print(f"    {dim}╰ ... (+{len(lines)-2} more lines){reset}")
+                    print(f"    {dim}╰ ... (+{len(lines) - 2} more lines){reset}")
 
             else:
                 print(f"  {green}╰ Result{reset} {duration}")
@@ -1449,7 +1467,7 @@ Available commands:
         print(top_border)
 
         lines = content.strip().split("\n")
-        max_lines = 15 # Don't overwhelm the screen
+        max_lines = 15  # Don't overwhelm the screen
 
         for i, line in enumerate(lines):
             if i >= max_lines:
@@ -1457,7 +1475,7 @@ Available commands:
                 break
 
             # Truncate line if it's too long for the box
-            display_line = line[:box_width-4]
+            display_line = line[: box_width - 4]
             # Pad the line to keep the right border aligned
             padding_needed = box_width - len(display_line) - 2
             print(f"  {cyan}║{reset}  {display_line}" + " " * padding_needed + f"{cyan}║{reset}")
@@ -1483,13 +1501,13 @@ Available commands:
 
         # Show what was removed (Red)
         for line in old_text.splitlines():
-            display_line = line[:box_width-6]
+            display_line = line[: box_width - 6]
             padding = box_width - len(display_line) - 4
             print(f"  {cyan}║{reset} {red}-{reset} {display_line}" + " " * padding + f"{cyan}║")
 
         # Show what was added (Green)
         for line in new_text.splitlines():
-            display_line = line[:box_width-6]
+            display_line = line[: box_width - 6]
             padding = box_width - len(display_line) - 4
             print(f"  {cyan}║{reset} {green}+{reset} {display_line}" + " " * padding + f"{cyan}║")
 
@@ -1561,5 +1579,3 @@ async def run_task(task: str, config: dict[str, Any] | None = None) -> tuple[str
     result, streamed = await repl.run_single(task)
     await repl.manager.close_all()
     return result, streamed
-
-

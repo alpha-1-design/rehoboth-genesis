@@ -39,8 +39,10 @@ class LoadingIndicator:
             time.sleep(0.1)
             i += 1
 
+
 def with_loading(func):
     """Decorator to wrap a function with loading indicator."""
+
     def wrapper(*args, **kwargs):
         indicator = LoadingIndicator(f"Running {func.__name__}")
         indicator.start()
@@ -51,7 +53,9 @@ def with_loading(func):
         except Exception as e:
             indicator.stop(f"Error: {e}")
             raise
+
     return wrapper
+
 
 class ProgressTracker:
     """Track multi-step progress."""
@@ -68,9 +72,7 @@ class ProgressTracker:
         bar = "▓" * int(pct * 10) + "░" * (10 - int(pct * 10))
         elapsed = time.time() - self.start_time
         label_str = f" — {label}" if label else ""
-        sys.stdout.write(
-            f"\r[{bar}] {pct:.0%}{label_str} ({elapsed:.1f}s)"
-        )
+        sys.stdout.write(f"\r[{bar}] {pct:.0%}{label_str} ({elapsed:.1f}s)")
         sys.stdout.flush()
 
     def finish(self) -> None:

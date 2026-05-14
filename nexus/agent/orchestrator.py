@@ -27,7 +27,7 @@ def estimate_tokens(text: str) -> int:
     """Estimate token count using a simple approximation (4 chars per token)."""
     if not text:
         return 0
-    return len(re.findall(r'\w+', text)) + (len(text) // 4)
+    return len(re.findall(r"\w+", text)) + (len(text) // 4)
 
 
 def prune_messages(
@@ -67,6 +67,7 @@ def prune_messages(
 @dataclass
 class AgentConfig:
     """Configuration for the agent orchestrator."""
+
     model: str | None = None
     provider_name: str | None = None
     max_turns: int = 50
@@ -83,6 +84,7 @@ class AgentConfig:
 @dataclass
 class Turn:
     """Represents a single turn in the conversation."""
+
     user_message: str
     assistant_message: str = ""
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
@@ -116,12 +118,7 @@ class AgentOrchestrator:
         self.tools = tool_registry
         self.memory = memory
         self.decomposer = LLMAwareDecomposer()
-        self.executor = ExecutionEngine(
-            self.tools,
-            self._execute_tool_callback,
-            llm_callback=self._execute_llm_callback,
-            provider_manager=self.pm
-        )
+        self.executor = ExecutionEngine(self.tools, self._execute_tool_callback, llm_callback=self._execute_llm_callback, provider_manager=self.pm)
         self.config = config or AgentConfig()
         self.reflection_engine = ReflectionEngine(Path("./.nexus/sessions"))
 
@@ -184,8 +181,7 @@ class AgentOrchestrator:
     def team(self) -> MultiAgentTeam | None:
         return self._team
 
-    def spawn_agent(self, role: AgentRole, name: str | None = None,
-                    task: str | None = None, model: str | None = None):
+    def spawn_agent(self, role: AgentRole, name: str | None = None, task: str | None = None, model: str | None = None):
         """Spawn an agent with the given role."""
         if self._team is None:
             self._team = self.init_team()
@@ -199,10 +195,7 @@ class AgentOrchestrator:
         """Set or update the system prompt."""
         self._messages = [Message(role="system", content=prompt)]
         if self.config.system_prompt:
-            self._messages[0] = Message(
-                role="system",
-                content=self.config.system_prompt + "\n\n" + prompt
-            )
+            self._messages[0] = Message(role="system", content=self.config.system_prompt + "\n\n" + prompt)
 
     async def run(self, user_input: str, stream_callback=None, thinking_callback=None) -> Turn:
         """Run a single interaction turn."""
@@ -216,9 +209,7 @@ class AgentOrchestrator:
 
         self._thinking.clear()
         analyze_step = self._thinking.start_step(
-            ThinkingState.ANALYZING,
-            "Analyzing task...",
-            detail=f"Input: {user_input[:100]}..." if len(user_input) > 100 else f"Input: {user_input}"
+            ThinkingState.ANALYZING, "Analyzing task...", detail=f"Input: {user_input[:100]}..." if len(user_input) > 100 else f"Input: {user_input}"
         )
 
         self._messages.append(Message(role="user", content=user_input))
@@ -226,11 +217,7 @@ class AgentOrchestrator:
         self._thinking.update_step(analyze_step, confidence=0.85)
         self._thinking.finish_step(analyze_step, result="Analyzed user input")
 
-        planning_step = self._thinking.start_step(
-            ThinkingState.PLANNING,
-            "Planning tool sequence...",
-            detail=f"Available tools: {len(self.tools.list_all())}"
-        )
+        planning_step = self._thinking.start_step(ThinkingState.PLANNING, "Planning tool sequence...", detail=f"Available tools: {len(self.tools.list_all())}")
         self._thinking.update_step(planning_step, confidence=0.75)
         self._thinking.finish_step(planning_step, result="Tool sequence planned")
 
@@ -242,17 +229,13 @@ class AgentOrchestrator:
                 turn.pending_approval = result["pending_approval"]
 
             review_step = self._thinking.start_step(
-                ThinkingState.REVIEWING,
-                "Generating response...",
-                detail=f"Response length: {len(result['message'])} chars"
+                ThinkingState.REVIEWING, "Generating response...", detail=f"Response length: {len(result['message'])} chars"
             )
             self._thinking.update_step(review_step, confidence=0.90)
             self._thinking.finish_step(review_step, result=result["message"][:200])
 
             complete_step = self._thinking.start_step(
-                ThinkingState.COMPLETE,
-                "Task complete",
-                detail=f"Completed in {len(result.get('tool_calls', []))} tool calls"
+                ThinkingState.COMPLETE, "Task complete", detail=f"Completed in {len(result.get('tool_calls', []))} tool calls"
             )
             self._thinking.finish_step(complete_step, result=result["message"][:200])
             turn.tokens_used = self._total_tokens
@@ -327,11 +310,7 @@ class AgentOrchestrator:
                     return {
                         "message": f"I have a proposed change for {tool_result.metadata['path']}. Please review the diff.",
                         "tool_calls": [],
-                        "pending_approval": {
-                            "tool_name": tc.name,
-                            "args": tc.arguments,
-                            "result": tool_result
-                        }
+                        "pending_approval": {"tool_name": tc.name, "args": tc.arguments, "result": tool_result},
                     }
 
                 tool_msg = f"Tool result for {tc.name}: {tool_result.content}"
@@ -349,12 +328,7 @@ class AgentOrchestrator:
         name = tool_call.name
         args = tool_call.arguments if isinstance(tool_call.arguments, dict) else {}
 
-        exec_step = self._thinking.start_step(
-            ThinkingState.EXECUTING,
-            f"Calling tool: {name}",
-            tool_name=name,
-            tool_args=args
-        )
+        exec_step = self._thinking.start_step(ThinkingState.EXECUTING, f"Calling tool: {name}", tool_name=name, tool_args=args)
 
         # 1. Safety Check
         safety = get_safety_engine()
@@ -408,7 +382,7 @@ class AgentOrchestrator:
                 result.content = await self._handle_tool_failure(name, args, result.error or result.content)
 
             if self.config.verbose:
-                print(f"\\n[nexus] Tool '{name}' failed (attempt {attempt+1}): {result.error}")
+                print(f"\\n[nexus] Tool '{name}' failed (attempt {attempt + 1}): {result.error}")
 
             if attempt < self.config.reflection_max_retries - 1 and self.config.reflection_enabled:
                 reflection = await self._reflect_on_failure(name, args, result.error or "")
@@ -427,14 +401,17 @@ class AgentOrchestrator:
         try:
             if path.endswith(".py"):
                 import ast
+
                 with open(path, encoding="utf-8") as f:
                     ast.parse(f.read())
             elif path.endswith(".json"):
                 import json
+
                 with open(path, encoding="utf-8") as f:
                     json.load(f)
             elif path.endswith((".yaml", ".yml")):
                 import yaml
+
                 with open(path, encoding="utf-8") as f:
                     yaml.safe_load(f)
             return True, None
@@ -444,6 +421,7 @@ class AgentOrchestrator:
     async def _handle_tool_failure(self, tool_name: str, args: dict, error: str) -> str:
         """Provide deterministic recovery hints for tool failures."""
         import os
+
         user_friendly_error = format_error(error)
         hint = f"Tool '{tool_name}' failed: {user_friendly_error}"
         if tool_name == "edit" and "context mismatch" in error.lower():
@@ -456,8 +434,8 @@ class AgentOrchestrator:
                     lines = content.splitlines()
                     for i, line in enumerate(lines):
                         if old_string in line:
-                            context_block = "\n".join(lines[max(0, i-2):min(len(lines), i+3)])
-                            hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i+1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
+                            context_block = "\n".join(lines[max(0, i - 2) : min(len(lines), i + 3)])
+                            hint += f"\n\n[RECOVERY HINT] 'old_string' was found at line {i + 1}, but context mismatch occurred. Here is the actual context in the file:\n{context_block}"
                             break
                 else:
                     hint += "\n\n[RECOVERY HINT] 'old_string' was NOT found in the file at all. Please use the 'read' tool to verify the current file content."
@@ -467,9 +445,7 @@ class AgentOrchestrator:
             hint += "\n\n[RECOVERY HINT] Verify the path exists using 'list' or 'glob'. Paths should usually be relative to the project root."
         return hint
 
-    async def _reflect_on_failure(
-        self, tool_name: str, args: dict, error: str
-    ) -> dict[str, Any]:
+    async def _reflect_on_failure(self, tool_name: str, args: dict, error: str) -> dict[str, Any]:
         """Ask the AI to suggest fixes for a failed tool call."""
         prompt = (
             f"Tool '{tool_name}' failed with error: {error}\n"
@@ -507,10 +483,7 @@ class AgentOrchestrator:
         non_system = [m for m in self._messages if m.role != "system"]
         keep = non_system[:2] + non_system[-target_turns:]
 
-        summary = Message(
-            role="system",
-            content=f"[Previous conversation summarized — {len(non_system)} messages condensed]"
-        )
+        summary = Message(role="system", content=f"[Previous conversation summarized — {len(non_system)} messages condensed]")
         self._messages = system + [summary] + keep
 
     @property

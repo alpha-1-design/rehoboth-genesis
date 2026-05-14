@@ -7,6 +7,7 @@ from ..tools.base import BaseTool, ToolDefinition, ToolResult
 
 def _get_browser():
     from ..automation.browser import BrowserManager
+
     return BrowserManager.get()
 
 
@@ -360,6 +361,7 @@ class BrowserSolveCaptchaTool(BaseTool):
 
 def _get_api_client():
     from ..automation.api_client import ApiAutomation
+
     return ApiAutomation()
 
 
@@ -384,18 +386,17 @@ class ApiFetchTool(BaseTool):
             category="automation",
         )
 
-    async def execute(self, url: str, params: dict | None = None,
-                      headers: dict | None = None, **kwargs) -> ToolResult:
+    async def execute(self, url: str, params: dict | None = None, headers: dict | None = None, **kwargs) -> ToolResult:
         try:
             import json
+
             client = _get_api_client()
             result = await client.get(url, params=params or {}, headers=headers or {})
 
             if result.get("blocked"):
                 return ToolResult(
                     success=False,
-                    content=f"Request blocked (status {result.get('status')}). "
-                            "Consider using browser_navigate instead.",
+                    content=f"Request blocked (status {result.get('status')}). Consider using browser_navigate instead.",
                     error=f"HTTP {result.get('status')}",
                 )
 
@@ -436,22 +437,25 @@ class ApiPostTool(BaseTool):
             category="automation",
         )
 
-    async def execute(self, url: str, data: dict | None = None,
-                      json_data: dict | None = None, params: dict | None = None,
-                      headers: dict | None = None, **kwargs) -> ToolResult:
+    async def execute(
+        self, url: str, data: dict | None = None, json_data: dict | None = None, params: dict | None = None, headers: dict | None = None, **kwargs
+    ) -> ToolResult:
         try:
             import json
+
             client = _get_api_client()
             result = await client.post(
-                url, data=data or {}, params=params or {},
-                headers=headers or {}, json_data=json_data,
+                url,
+                data=data or {},
+                params=params or {},
+                headers=headers or {},
+                json_data=json_data,
             )
 
             if result.get("blocked"):
                 return ToolResult(
                     success=False,
-                    content=f"Request blocked (status {result.get('status')}). "
-                            "Consider using browser_fill_form instead.",
+                    content=f"Request blocked (status {result.get('status')}). Consider using browser_fill_form instead.",
                     error=f"HTTP {result.get('status')}",
                 )
 
@@ -553,8 +557,7 @@ class ApiUploadTool(BaseTool):
             category="automation",
         )
 
-    async def execute(self, url: str, file_path: str, field_name: str = "file",
-                      data: dict | None = None, **kwargs) -> ToolResult:
+    async def execute(self, url: str, file_path: str, field_name: str = "file", data: dict | None = None, **kwargs) -> ToolResult:
         try:
             import json
             from pathlib import Path

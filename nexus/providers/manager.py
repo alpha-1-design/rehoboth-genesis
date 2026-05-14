@@ -131,7 +131,7 @@ class ProviderManager:
                         print(f"  \033[34m╼\033[0m \033[90mnexus/providers\033[0m \033[33mNetwork error on {name}, retrying in {wait}s...\033[0m")
                         await asyncio.sleep(wait)
                         continue
-                    break # Exhausted retries for this provider
+                    break  # Exhausted retries for this provider
                 except Exception as e:
                     last_error = e
                     cyan = "\033[36m"
@@ -185,13 +185,9 @@ class ProviderManager:
         **kwargs,
     ) -> list[Response | Exception]:
         """Execute multiple completions in parallel using different providers/keys."""
+
         async def _run_task(task_data: dict[str, Any]) -> Response:
-            return await self.complete(
-                messages=task_data["messages"],
-                tools=task_data.get("tools"),
-                provider_name=task_data.get("provider_name"),
-                **kwargs
-            )
+            return await self.complete(messages=task_data["messages"], tools=task_data.get("tools"), provider_name=task_data.get("provider_name"), **kwargs)
 
         return await asyncio.gather(*[_run_task(t) for t in tasks], return_exceptions=True)
 
@@ -254,10 +250,12 @@ def _load_config_into_manager(manager: ProviderManager) -> None:
     """Load provider configurations from config file."""
     try:
         from ..config import load_config
+
         cfg = load_config()
 
         for name, prov_config in cfg.providers.items():
             from ..config import ProviderConfig
+
             manager.configs[name] = ProviderConfig(
                 name=prov_config.name,
                 provider_type=prov_config.provider_type,

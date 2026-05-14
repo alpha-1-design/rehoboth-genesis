@@ -25,6 +25,7 @@ def _run_async(coro):
     try:
         loop = asyncio.get_running_loop()
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, coro)
             return future.result()
@@ -184,9 +185,7 @@ class NexusAPI:
     def get_facts(self) -> dict[str, Any]:
         """Get all stored facts."""
         memory = get_memory()
-        return {
-            "facts": [asdict(fact) for fact in memory._facts.values()]
-        }
+        return {"facts": [asdict(fact) for fact in memory._facts.values()]}
 
     def add_fact(self, key: str, value: Any, category: str = "general") -> dict[str, Any]:
         """Add a fact."""
@@ -197,9 +196,7 @@ class NexusAPI:
     def list_sessions(self, limit: int = 20) -> dict[str, Any]:
         """List conversation sessions."""
         memory = get_memory()
-        return {
-            "sessions": [s.to_dict() for s in memory.list_sessions(limit=limit)]
-        }
+        return {"sessions": [s.to_dict() for s in memory.list_sessions(limit=limit)]}
 
     async def run_agent_task(self, task: str, stream_callback=None) -> dict[str, Any]:
         """Run a task through the agent orchestrator."""
@@ -242,6 +239,7 @@ class NexusAPI:
         """Get browser/API automation status."""
         try:
             from ..automation.browser import BrowserManager, is_browser_available
+
             browser_available = is_browser_available()
             has_session = BrowserManager.get() is not None
         except Exception:
@@ -250,6 +248,7 @@ class NexusAPI:
 
         try:
             import httpx
+
             httpx_available = True
         except ImportError:
             httpx_available = False

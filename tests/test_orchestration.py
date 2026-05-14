@@ -1,4 +1,3 @@
-
 from nexus.agent import get_orchestrator
 
 
@@ -7,6 +6,7 @@ def test_orchestrator_singleton():
     orch1 = get_orchestrator()
     orch2 = get_orchestrator()
     assert orch1 is orch2
+
 
 def test_orchestrator_initialization():
     """Verify orchestrator is initialized correctly."""

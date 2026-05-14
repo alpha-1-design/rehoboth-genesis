@@ -86,9 +86,7 @@ class EvolutionManager:
         with open(path, "w") as f:
             json.dump(task.to_dict(), f, indent=2)
 
-    def propose_evolution(
-        self, description: str, changes: dict[str, str], lesson_id: str | None = None
-    ) -> EvolutionTask:
+    def propose_evolution(self, description: str, changes: dict[str, str], lesson_id: str | None = None) -> EvolutionTask:
         """Initiate a new evolution proposal."""
         task = EvolutionTask(
             id=str(uuid.uuid4())[:8],
@@ -101,9 +99,7 @@ class EvolutionManager:
         self.save_evolution(task)
         return task
 
-    def transition(
-        self, task_id: str, new_state: EvolutionState, report: str | None = None
-    ) -> EvolutionTask:
+    def transition(self, task_id: str, new_state: EvolutionState, report: str | None = None) -> EvolutionTask:
         """Transition an evolution task to a new state."""
         task = self.active_evolutions.get(task_id)
         if not task:
@@ -111,9 +107,7 @@ class EvolutionManager:
 
         task.state = new_state
         if report:
-            task.stability_report = (
-                report if new_state == EvolutionState.STABILITY_CHECK else task.stability_report
-            )
+            task.stability_report = report if new_state == EvolutionState.STABILITY_CHECK else task.stability_report
             if new_state == EvolutionState.HIVE_REVIEW:
                 task.reviewer_feedback = report
 
@@ -122,8 +116,4 @@ class EvolutionManager:
 
     def get_pending_evolutions(self) -> list[EvolutionTask]:
         """Get all evolutions that are not yet merged or rejected."""
-        return [
-            t
-            for t in self.active_evolutions.values()
-            if t.state not in (EvolutionState.MERGED, EvolutionState.REJECTED)
-        ]
+        return [t for t in self.active_evolutions.values() if t.state not in (EvolutionState.MERGED, EvolutionState.REJECTED)]

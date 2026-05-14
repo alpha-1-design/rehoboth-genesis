@@ -10,6 +10,7 @@ def is_termux() -> bool:
     """Check if we are running in Termux."""
     return os.path.exists("/data/data/com.termux/files/usr/bin/termux-setup-storage")
 
+
 def get_env_warning(package_name: str) -> str | None:
     """Return a warning message if the environment might be incompatible with the package."""
     if is_termux():
@@ -20,6 +21,7 @@ def get_env_warning(package_name: str) -> str | None:
         if package_name in ("pyaudio",):
             return "PyAudio requires system-level audio headers (portaudio) which can be tricky to configure in Termux."
     return None
+
 
 def ensure_dependency(package_name: str, import_name: str | None = None) -> bool:
     """Checks if a package is installed, offers to install if missing."""
@@ -42,7 +44,7 @@ def ensure_dependency(package_name: str, import_name: str | None = None) -> bool
         if warning:
             print(f"    {yellow}⚠ WARNING:{reset} {warning}")
             choice = input(f"    {bold}Proceed anyway?{reset} (y/N): ").strip().lower()
-            if choice not in ('y', 'yes'):
+            if choice not in ("y", "yes"):
                 print(f"    {dim}Aborting installation for safety.{reset}")
                 return False
 
@@ -50,7 +52,7 @@ def ensure_dependency(package_name: str, import_name: str | None = None) -> bool
 
         choice = input(f"    {bold}Initialize extension?{reset} (y/N): ").strip().lower()
 
-        if choice in ('y', 'yes'):
+        if choice in ("y", "yes"):
             print(f"    {dim}Installing {package_name}...{reset}")
             try:
                 # Use --no-cache-dir and other flags if helpful for mobile

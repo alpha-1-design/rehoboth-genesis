@@ -22,21 +22,55 @@ logger = get_logger(__name__)
 
 
 TASK_KEYWORDS = [
-    "create", "write", "make file", "build", "generate",
-    "fix", "bug", "error", "crash", "patch",
-    "analyze", "audit", "review", "assess",
-    "test", "run tests", "testing",
-    "deploy", "release", "publish",
-    "refactor", "rename", "move", "copy",
-    "install", "setup", "configure",
-    "debug", "troubleshoot",
+    "create",
+    "write",
+    "make file",
+    "build",
+    "generate",
+    "fix",
+    "bug",
+    "error",
+    "crash",
+    "patch",
+    "analyze",
+    "audit",
+    "review",
+    "assess",
+    "test",
+    "run tests",
+    "testing",
+    "deploy",
+    "release",
+    "publish",
+    "refactor",
+    "rename",
+    "move",
+    "copy",
+    "install",
+    "setup",
+    "configure",
+    "debug",
+    "troubleshoot",
 ]
 
 NEEDS_TOOLS_KEYWORDS = [
-    "write", "create file", "edit", "modify", "delete file",
-    "run", "execute", "bash", "command",
-    "read", "list files", "search", "grep", "find",
-    "build", "compile", "test",
+    "write",
+    "create file",
+    "edit",
+    "modify",
+    "delete file",
+    "run",
+    "execute",
+    "bash",
+    "command",
+    "read",
+    "list files",
+    "search",
+    "grep",
+    "find",
+    "build",
+    "compile",
+    "test",
 ]
 
 
@@ -86,6 +120,7 @@ class ExecutionEngine:
             return self._multi_key_enabled
 
         from ..providers import get_manager
+
         manager = get_manager()
         enabled = manager.get_enabled_providers()
 
@@ -97,7 +132,7 @@ class ExecutionEngine:
         choice = input("    \033[1mActivate Parallel Neural Processing (Multi-Key)?\033[0m (y/N): ").strip().lower()
 
         self._consent_asked = True
-        self._multi_key_enabled = choice in ('y', 'yes')
+        self._multi_key_enabled = choice in ("y", "yes")
 
         if self._multi_key_enabled:
             print("    \033[32m✔\033[0m Multi-key orchestration engaged.")
@@ -142,6 +177,7 @@ class ExecutionEngine:
     async def _execute_batch_parallel(self, batch: list[ExecutionStep], plan: TaskPlan, progress_callback: Any):
         """Execute a batch of steps in parallel using multiple keys."""
         from ..providers import get_manager
+
         manager = get_manager()
         providers = manager.get_enabled_providers()
 
@@ -274,6 +310,7 @@ class ExecutionEngine:
                 return await self.llm_callback(prompt)
 
         return await self.llm_callback(prompt)
+
     def _resolve_step_args(self, step: ExecutionStep) -> dict[str, Any]:
         """Resolve step arguments, substituting dependency results."""
         resolved = step.args.copy()

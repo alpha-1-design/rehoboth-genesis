@@ -20,13 +20,13 @@ from ..memory import Memory, Session, get_memory
 class SessionAutoLoader:
     """
     Handles automatic session loading and persistence.
-    
+
     On Nexus start:
     1. Find the most recent session
     2. Load its context summary
     3. Ask user if they want to continue
     4. Load full session messages if continuing
-    
+
     On exit: auto-save current session
     On crash: sessions are saved incrementally (not just on exit)
     """
@@ -49,15 +49,17 @@ class SessionAutoLoader:
         sessions = self.memory.list_sessions(limit=limit)
         result = []
         for s in sessions:
-            result.append({
-                "id": s.id,
-                "created_at": s.created_at.isoformat() if s.created_at else "",
-                "updated_at": s.updated_at.isoformat() if s.updated_at else "",
-                "message_count": len(s.messages),
-                "tools_used": len(s.tools_used),
-                "outcome": s.outcome or "in progress",
-                "preview": s.messages[-1]["content"][:80] if s.messages else "",
-            })
+            result.append(
+                {
+                    "id": s.id,
+                    "created_at": s.created_at.isoformat() if s.created_at else "",
+                    "updated_at": s.updated_at.isoformat() if s.updated_at else "",
+                    "message_count": len(s.messages),
+                    "tools_used": len(s.tools_used),
+                    "outcome": s.outcome or "in progress",
+                    "preview": s.messages[-1]["content"][:80] if s.messages else "",
+                }
+            )
         return result
 
     def save_session(self, session: Session, crash_safe: bool = True) -> str:
@@ -147,7 +149,7 @@ class SessionAutoLoader:
             lines.append(f"  [{i}] {s['id'][:8]} ({date})")
             lines.append(f"      {msgs} msgs, {tools} tools — {outcome}")
             if preview:
-                lines.append(f"      \"{preview}...\"")
+                lines.append(f'      "{preview}..."')
 
         return "\n".join(lines)
 
@@ -174,7 +176,7 @@ Continue from last session? (y/n): """
 class ProjectContext:
     """
     Per-project context that auto-switches when the working directory changes.
-    
+
     Project context files live at: <project_root>/.nexus/context.json
     """
 
@@ -214,9 +216,17 @@ class ProjectContext:
         """Walk up from path to find a project marker."""
         search = path or Path.cwd()
         markers = [
-            ".git", "pyproject.toml", "package.json", "Cargo.toml",
-            "go.mod", "Makefile", ".nexus", "requirements.txt",
-            "setup.py", ".codeclimate", "package-lock.json",
+            ".git",
+            "pyproject.toml",
+            "package.json",
+            "Cargo.toml",
+            "go.mod",
+            "Makefile",
+            ".nexus",
+            "requirements.txt",
+            "setup.py",
+            ".codeclimate",
+            "package-lock.json",
         ]
         while search != search.parent:
             for marker in markers:

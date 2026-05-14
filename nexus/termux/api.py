@@ -13,7 +13,7 @@ from typing import Any
 
 class TermuxAPI:
     """Interface to Termux API tools.
-    
+
     All methods return tuples of (success: bool, result: str).
     Gracefully degrade on non-Termux platforms.
     """
@@ -24,11 +24,7 @@ class TermuxAPI:
 
     def _detect_termux(self) -> bool:
         """Detect if running in Termux."""
-        return (
-            os.path.exists("/data/data/com.termux") or
-            os.environ.get("TERMUX_VERSION") or
-            os.path.exists("/system/bin/termux-api")
-        )
+        return os.path.exists("/data/data/com.termux") or os.environ.get("TERMUX_VERSION") or os.path.exists("/system/bin/termux-api")
 
     @property
     def is_available(self) -> bool:
@@ -73,10 +69,9 @@ class TermuxAPI:
 
     # === Notifications ===
 
-    def notify(self, title: str, content: str, id: int = 0,
-               sound: bool = True, priority: str = "default") -> tuple[bool, str]:
+    def notify(self, title: str, content: str, id: int = 0, sound: bool = True, priority: str = "default") -> tuple[bool, str]:
         """Show a notification.
-        
+
         Args:
             title: Notification title
             content: Notification body
@@ -86,11 +81,15 @@ class TermuxAPI:
         """
         cmd = [
             "termux-notification",
-            "--title", title,
-            "--text", content,
-            "--id", str(id),
+            "--title",
+            title,
+            "--text",
+            content,
+            "--id",
+            str(id),
             sound and "--sound" or "--no-sound",
-            "--priority", priority,
+            "--priority",
+            priority,
         ]
         return self._run(cmd)
 
@@ -135,8 +134,7 @@ class TermuxAPI:
 
     # === Share ===
 
-    def share(self, text: str | None = None, file: str | None = None,
-              title: str = "Nexus Share") -> tuple[bool, str]:
+    def share(self, text: str | None = None, file: str | None = None, title: str = "Nexus Share") -> tuple[bool, str]:
         """Share text or a file."""
         cmd = ["termux-share", "--title", title]
         if text:
@@ -182,14 +180,16 @@ class TermuxAPI:
 
     # === Job Scheduler ===
 
-    def job_schedule(self, script: str, period_ms: int = 60000,
-                     after: int = 0) -> tuple[bool, str]:
+    def job_schedule(self, script: str, period_ms: int = 60000, after: int = 0) -> tuple[bool, str]:
         """Schedule a recurring job."""
         cmd = [
             "termux-job-scheduler",
-            "--script", script,
-            "--period", str(period_ms),
-            "--after", str(after),
+            "--script",
+            script,
+            "--period",
+            str(period_ms),
+            "--after",
+            str(after),
         ]
         return self._run(cmd)
 
@@ -200,6 +200,7 @@ class TermuxAPI:
 
 # Singleton
 _termux_api: TermuxAPI | None = None
+
 
 def get_termux_api() -> TermuxAPI:
     global _termux_api

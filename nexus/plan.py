@@ -148,12 +148,11 @@ Rules:
         try:
             data = json.loads(content)
         except json.JSONDecodeError:
-            match = re.search(r'\{.*\}', content, re.DOTALL)
+            match = re.search(r"\{.*\}", content, re.DOTALL)
             if match:
                 data = json.loads(match.group())
             else:
-                data = {"task_summary": self.task, "confidence": 0.5,
-                        "estimated_minutes": 5, "steps": []}
+                data = {"task_summary": self.task, "confidence": 0.5, "estimated_minutes": 5, "steps": []}
 
         plan = Plan(
             task=data.get("task_summary", self.task),
@@ -163,15 +162,17 @@ Rules:
         )
 
         for i, step_data in enumerate(data.get("steps", []), 1):
-            plan.steps.append(PlanStep(
-                step_id=i,
-                description=step_data.get("description", ""),
-                priority=StepPriority(step_data.get("priority", "MED")),
-                confidence=step_data.get("confidence", 0.8),
-                effort_minutes=step_data.get("effort_minutes", 1),
-                tool_name=step_data.get("tool_name"),
-                tool_args=step_data.get("tool_args") or {},
-            ))
+            plan.steps.append(
+                PlanStep(
+                    step_id=i,
+                    description=step_data.get("description", ""),
+                    priority=StepPriority(step_data.get("priority", "MED")),
+                    confidence=step_data.get("confidence", 0.8),
+                    effort_minutes=step_data.get("effort_minutes", 1),
+                    tool_name=step_data.get("tool_name"),
+                    tool_args=step_data.get("tool_args") or {},
+                )
+            )
 
         self.plan = plan
         return plan
@@ -182,11 +183,11 @@ Rules:
             return "No plan generated yet."
 
         lines = []
-        lines.append(f"\n{'='*60}")
+        lines.append(f"\n{'=' * 60}")
         lines.append(f"PLAN MODE — {self.plan.task}")
-        lines.append(f"{'='*60}")
+        lines.append(f"{'=' * 60}")
         lines.append(f"Confidence: {self.plan.confidence:.0%}  |  Est: ~{self.plan.estimated_minutes:.0f}min  |  Steps: {self.plan.total_steps}")
-        lines.append(f"{'─'*60}")
+        lines.append(f"{'─' * 60}")
 
         for step in self.plan.steps:
             status_icon = {
@@ -217,7 +218,7 @@ Rules:
             if step.error:
                 lines.append(f"       ✗ {step.error}")
 
-        lines.append(f"{'─'*60}")
+        lines.append(f"{'─' * 60}")
         lines.append("[A]pprove all  [S]kip low-priority  [N]o auto-approve  [Q]uit plan mode  [E]dit step")
         lines.append("")
         return "\n".join(lines)
@@ -292,17 +293,16 @@ def should_trigger_plan_mode(task: str) -> bool:
     """Detect if a task is complex enough to warrant planning."""
     task_lower = task.lower()
 
-    action_verbs = sum(1 for w in ["build", "create", "implement", "design",
-        "refactor", "migrate", "setup", "deploy", "test", "fix", "update",
-        "add", "configure", "integrate"] if w in task_lower)
+    action_verbs = sum(
+        1
+        for w in ["build", "create", "implement", "design", "refactor", "migrate", "setup", "deploy", "test", "fix", "update", "add", "configure", "integrate"]
+        if w in task_lower
+    )
 
-    file_mentions = len(re.findall(r'(?:src/|file|\.py|\.js|module|component)', task_lower))
+    file_mentions = len(re.findall(r"(?:src/|file|\.py|\.js|module|component)", task_lower))
 
     complexity_score = action_verbs * 2 + file_mentions
 
     return complexity_score >= 3 or any(
-        w in task_lower for w in [
-            "multiple", "entire", "full", "complete", "comprehensive",
-            "architecture", "system", "restructure", "migrate"
-        ]
+        w in task_lower for w in ["multiple", "entire", "full", "complete", "comprehensive", "architecture", "system", "restructure", "migrate"]
     )

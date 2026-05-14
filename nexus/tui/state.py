@@ -16,6 +16,7 @@ class MessageRole(Enum):
 @dataclass
 class ChatMessage:
     """A chat message."""
+
     role: MessageRole
     content: str
     timestamp: datetime = field(default_factory=datetime.now)
@@ -33,6 +34,7 @@ class ToolStatus(Enum):
 @dataclass
 class ToolInfo:
     """Information about a tool execution."""
+
     name: str
     status: ToolStatus = ToolStatus.PENDING
     started_at: datetime | None = None
@@ -53,6 +55,7 @@ class AgentStatus(Enum):
 @dataclass
 class AgentInfo:
     """Information about an active agent."""
+
     name: str
     role: str
     status: AgentStatus = AgentStatus.IDLE
@@ -63,6 +66,7 @@ class AgentInfo:
 @dataclass
 class ThinkingStep:
     """A thinking step."""
+
     step_number: int
     description: str
     details: str = ""
@@ -72,6 +76,7 @@ class ThinkingStep:
 @dataclass
 class TUIState:
     """State for the TUI."""
+
     messages: list[ChatMessage] = field(default_factory=list)
     thinking_steps: list[ThinkingStep] = field(default_factory=list)
     active_agents: list[AgentInfo] = field(default_factory=list)

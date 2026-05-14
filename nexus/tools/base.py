@@ -12,6 +12,7 @@ from typing import Any
 @dataclass
 class ToolDefinition:
     """Definition of a tool for the AI model."""
+
     name: str
     description: str
     input_schema: dict[str, Any]
@@ -22,6 +23,7 @@ class ToolDefinition:
 @dataclass
 class ToolResult:
     """Result from executing a tool."""
+
     success: bool
     content: str
     error: str | None = None
@@ -145,9 +147,11 @@ def get_registry() -> ToolRegistry:
 def _register_core_tools(registry: ToolRegistry) -> None:
     """Register all core tools."""
     from . import core as core_tools
+
     core_tools.register_all(registry)
     try:
         from ..termux import registry as termux_registry
+
         termux_registry.register_termux_tools(registry)
     except Exception:
         pass

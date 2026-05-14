@@ -19,6 +19,7 @@ from typing import Any
 
 try:
     import numpy as np
+
     NUMPY_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
@@ -27,6 +28,7 @@ except ImportError:
 @dataclass
 class MemoryEntry:
     """A single entry in vector memory."""
+
     id: str
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -106,11 +108,13 @@ class SimpleKeywordBackend(VectorMemoryBackend):
     def _add_sync(self, entry: MemoryEntry, tags: str) -> None:
         with self._lock:
             c = self._conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT OR REPLACE INTO memory_entries (id, content, metadata, tags, created_at, access_count)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (entry.id, entry.content, json.dumps(entry.metadata), tags,
-                  entry.created_at, entry.access_count))
+            """,
+                (entry.id, entry.content, json.dumps(entry.metadata), tags, entry.created_at, entry.access_count),
+            )
             c.execute("INSERT INTO memory_fts(memory_fts, rowid) VALUES('reindex', last_insert_rowid())")
             self._conn.commit()
 
@@ -128,33 +132,41 @@ class SimpleKeywordBackend(VectorMemoryBackend):
             c = self._conn.cursor()
 
             if len(terms) == 1:
-                c.execute("""
+                c.execute(
+                    """
                     SELECT m.id, m.content, m.metadata, m.tags, m.created_at, m.access_count
                     FROM memory_entries m
                     WHERE LOWER(m.content) LIKE ?
                     ORDER BY m.access_count DESC, m.created_at DESC
                     LIMIT ?
-                """, (f"%{terms[0]}%", limit))
+                """,
+                    (f"%{terms[0]}%", limit),
+                )
             else:
-                c.execute("""
+                c.execute(
+                    """
                     SELECT m.id, m.content, m.metadata, m.tags, m.created_at, m.access_count
                     FROM memory_entries m
                     WHERE LOWER(m.content) LIKE ? AND LOWER(m.content) LIKE ?
                     ORDER BY m.access_count DESC, m.created_at DESC
                     LIMIT ?
-                """, (f"%{terms[0]}%", f"%{terms[-1]}%", limit))
+                """,
+                    (f"%{terms[0]}%", f"%{terms[-1]}%", limit),
+                )
 
             rows = c.fetchall()
             results = []
             for row in rows:
                 entry_id, content, metadata_json, tags, created_at, access_count = row
-                results.append(MemoryEntry(
-                    id=entry_id,
-                    content=content,
-                    metadata=json.loads(metadata_json),
-                    created_at=created_at,
-                    access_count=access_count,
-                ))
+                results.append(
+                    MemoryEntry(
+                        id=entry_id,
+                        content=content,
+                        metadata=json.loads(metadata_json),
+                        created_at=created_at,
+                        access_count=access_count,
+                    )
+                )
                 c.execute("UPDATE memory_entries SET access_count = access_count + 1 WHERE id = ?", (entry_id,))
                 c.execute("INSERT INTO memory_access(entry_id) VALUES (?)", (entry_id,))
             self._conn.commit()
@@ -222,16 +234,14 @@ class OllamaEmbeddingBackend(VectorMemoryBackend):
     def _get_client(self) -> Any:
         if self._client is None:
             import httpx
+
             self._client = httpx.AsyncClient(timeout=30.0)
         return self._client
 
     async def _embed(self, texts: list[str]) -> list[list[float]]:
         client = self._get_client()
         try:
-            resp = await client.post(
-                "http://localhost:11434/api/embeddings",
-                json={"model": self.embed_model, "prompt": texts[0]}
-            )
+            resp = await client.post("http://localhost:11434/api/embeddings", json={"model": self.embed_model, "prompt": texts[0]})
             if resp.status_code == 200:
                 return [resp.json()["embedding"]]
         except Exception:
@@ -315,14 +325,17 @@ class VectorMemory:
             total = c.fetchone()[0]
             if total > max_entries:
                 excess = total - max_entries
-                c.execute("""
+                c.execute(
+                    """
                     DELETE FROM memory_entries
                     WHERE id IN (
                         SELECT id FROM memory_entries
                         ORDER BY access_count ASC, created_at ASC
                         LIMIT ?
                     )
-                """, (excess,))
+                """,
+                    (excess,),
+                )
                 removed = c.rowcount
                 conn.commit()
             conn.close()

@@ -39,9 +39,7 @@ class ReadTool(BaseTool):
             category="filesystem",
         )
 
-    async def execute(
-        self, path: str, limit: int | None = None, offset: int | None = None, **kwargs
-    ) -> ToolResult:
+    async def execute(self, path: str, limit: int | None = None, offset: int | None = None, **kwargs) -> ToolResult:
         try:
             file_path = Path(path)
             if not file_path.exists():
@@ -401,6 +399,7 @@ class BashTool(BaseTool):
     ) -> ToolResult:
         # Check safety first
         from ..safety import get_safety_engine
+
         safety = get_safety_engine()
         context = {"tool": "bash", "command": command}
         violations = safety.check(context)
@@ -588,9 +587,7 @@ class WebSearchTool(BaseTool):
 
                 results = []
                 for item in data.get("results", []):
-                    results.append(
-                        f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('snippet', '')}\n"
-                    )
+                    results.append(f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('snippet', '')}\n")
 
                 return ToolResult(
                     success=True,
@@ -618,9 +615,7 @@ class WebSearchTool(BaseTool):
 
                 results = []
                 for item in data.get("results", []):
-                    results.append(
-                        f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('content', '')}\n"
-                    )
+                    results.append(f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('content', '')}\n")
 
                 return ToolResult(
                     success=True,
@@ -644,9 +639,7 @@ class WebSearchTool(BaseTool):
 
                 results = []
                 for item in data.get("web", {}).get("results", []):
-                    results.append(
-                        f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('description', '')}\n"
-                    )
+                    results.append(f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('description', '')}\n")
 
                 return ToolResult(
                     success=True,
@@ -660,20 +653,21 @@ class WebSearchTool(BaseTool):
         try:
             try:
                 from ddgs import DDGS
+
                 with DDGS() as ddgs:
                     results = list(ddgs.text(query, max_results=num))
             except ImportError:
                 import warnings
+
                 warnings.filterwarnings("ignore", message=".*duckduckgo_search.*")
                 from duckduckgo_search import DDGS
+
                 with DDGS() as ddgs:
                     results = list(ddgs.text(query, max_results=num))
 
             output = []
             for item in results:
-                output.append(
-                    f"## {item.get('title', 'Untitled')}\n{item.get('href', '')}\n{item.get('body', '')}\n"
-                )
+                output.append(f"## {item.get('title', 'Untitled')}\n{item.get('href', '')}\n{item.get('body', '')}\n")
 
             return ToolResult(
                 success=True,
@@ -847,9 +841,7 @@ class CodeSearchTool(BaseTool):
 
                 results = []
                 for item in data.get("results", []):
-                    results.append(
-                        f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('snippet', '')}\n"
-                    )
+                    results.append(f"## {item.get('title', 'Untitled')}\n{item.get('url', '')}\n{item.get('snippet', '')}\n")
 
                 return ToolResult(
                     success=True,

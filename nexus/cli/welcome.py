@@ -6,7 +6,8 @@ import time
 
 
 def clear():
-    os.system('clear' if os.name == 'posix' else 'cls')
+    os.system("clear" if os.name == "posix" else "cls")
+
 
 def fade_print(text, delay=0.01):
     for char in text:
@@ -15,10 +16,11 @@ def fade_print(text, delay=0.01):
         time.sleep(delay)
     print()
 
+
 def get_logo(config=None):
     """Dynamic logo that derives color from the provider identity."""
     # Generate a deterministic color based on the provider name hash
-    provider_name = (config.active_provider if config else "nexus-default")
+    provider_name = config.active_provider if config else "nexus-default"
     hash_val = sum(ord(c) for c in provider_name)
     # Map to one of the 6 standard terminal colors (31-36)
     color_code = 31 + (hash_val % 6)
@@ -36,9 +38,11 @@ def get_logo(config=None):
           {color}∞  THE NEURAL OS ({provider_name.upper()})  ∞{reset}
     """
 
+
 def display_welcome():
     clear()
     from ..config import load_config
+
     config = load_config()
 
     logo = get_logo(config)

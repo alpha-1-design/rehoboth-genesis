@@ -10,13 +10,7 @@ class SkillDiscoverer:
     def __init__(self, nexus_dir: Path):
         self.nexus_dir = nexus_dir
         self.skills_dir = nexus_dir / "skills"
-        self.known_tools = {
-            "docker": "docker-manager",
-            "node": "node-dev-tool",
-            "rustc": "rust-expert",
-            "pytest": "test-runner",
-            "sqlite3": "db-admin"
-        }
+        self.known_tools = {"docker": "docker-manager", "node": "node-dev-tool", "rustc": "rust-expert", "pytest": "test-runner", "sqlite3": "db-admin"}
 
     def discover(self):
         """Scan system and propose new skills."""
@@ -30,7 +24,7 @@ class SkillDiscoverer:
         if discovered:
             print(f"[!] Found new capabilities: {[d[0] for d in discovered]}")
             for tool, skill in discovered:
-                if input(f"Register skill '{skill}' for {tool}? [y/n]: ").lower() == 'y':
+                if input(f"Register skill '{skill}' for {tool}? [y/n]: ").lower() == "y":
                     self._register_skill(skill)
         else:
             print("[✓] No new skills discovered. All known tools integrated.")

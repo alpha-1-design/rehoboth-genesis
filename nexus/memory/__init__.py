@@ -14,6 +14,7 @@ from typing import Any
 @dataclass
 class Session:
     """A conversation session."""
+
     id: str
     created_at: datetime
     updated_at: datetime
@@ -49,6 +50,7 @@ class Session:
 @dataclass
 class Fact:
     """A stored fact about the user or project."""
+
     key: str
     value: Any
     category: str = "general"
@@ -72,6 +74,7 @@ class Memory:
 
     def __init__(self, memory_dir: Path | None = None):
         from ..config import DEFAULT_MEMORY_DIR
+
         self.memory_dir = memory_dir or DEFAULT_MEMORY_DIR
         self.sessions_dir = self.memory_dir / "sessions"
         self.projects_dir = self.memory_dir / "projects"
@@ -287,7 +290,8 @@ class ProjectIndexer:
 
                 file_path = os.path.join(dirpath, filename)
                 try:
-                    if not os.path.exists(file_path): continue
+                    if not os.path.exists(file_path):
+                        continue
                     file_info = {
                         "path": os.path.relpath(file_path, root),
                         "type": ext.lstrip("."),
@@ -295,7 +299,7 @@ class ProjectIndexer:
                     }
                     project_info["files"].append(file_info)
                 except (OSError, FileNotFoundError):
-                    continue # Skip inaccessible files
+                    continue  # Skip inaccessible files
 
                 if ext == ".py":
                     if project_info["language"] is None:
@@ -356,6 +360,7 @@ class ProjectIndexer:
             audit["python"]["file"] = pyproject
             try:
                 import toml
+
                 with open(pyproject) as f:
                     data = toml.loads(f.read())
                     deps = data.get("project", {}).get("dependencies", [])
@@ -367,9 +372,7 @@ class ProjectIndexer:
         if os.path.exists(req_txt):
             audit["python"]["file"] = req_txt
             with open(req_txt) as f:
-                audit["python"]["packages"] = [
-                    line.strip() for line in f if line.strip() and not line.startswith("#")
-                ]
+                audit["python"]["packages"] = [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
         pkg_json = os.path.join(root, "package.json")
         if os.path.exists(pkg_json):

@@ -24,6 +24,7 @@ def cli(ctx: click.Context, config: str | None) -> None:
     of OpenClaw, Claude Code, Gemini CLI, OpenCode, and NemoClaw.
     """
     from nexus.config import load_config
+
     ctx.ensure_object(dict)
     if config:
         ctx.obj["config"] = load_config(Path(config))
@@ -35,6 +36,7 @@ def cli(ctx: click.Context, config: str | None) -> None:
 def upgrade() -> None:
     """Upgrade Nexus to the latest version."""
     import subprocess
+
     click.echo(f"\n{chr(0x2728)} Checking for updates...")
     try:
         # Fetch latest
@@ -53,12 +55,12 @@ def provider():
     pass
 
 
-
 @provider.command("list")
 @click.pass_context
 def provider_list(ctx: click.Context) -> None:
     """List all configured providers."""
     from nexus.providers import get_manager
+
     config: NexusConfig = ctx.obj["config"]
     get_manager()
 
@@ -92,6 +94,7 @@ def provider_add(
 ) -> None:
     """Add a new AI provider."""
     from nexus.config import ProviderConfig, save_config
+
     config: NexusConfig = ctx.obj["config"]
 
     config.providers[name] = ProviderConfig(
@@ -112,6 +115,7 @@ def provider_add(
 def provider_remove(ctx: click.Context, name: str) -> None:
     """Remove a provider."""
     from nexus.config import save_config
+
     config: NexusConfig = ctx.obj["config"]
 
     if name in config.providers:
@@ -129,6 +133,7 @@ def provider_set_active(ctx: click.Context, name: str) -> None:
     """Set the active provider."""
     from nexus.config import save_config
     from nexus.providers import get_manager
+
     config: NexusConfig = ctx.obj["config"]
 
     if name not in config.providers:
@@ -294,9 +299,7 @@ def sync_status() -> None:
 @click.option("--token", help="API token (GitHub)")
 @click.option("--path", type=click.Path(), help="Local path or git remote URL")
 @click.option("--url", help="Service URL")
-def sync_connect(
-    target_type: str, name: str | None, token: str | None, path: str | None, url: str | None
-) -> None:
+def sync_connect(target_type: str, name: str | None, token: str | None, path: str | None, url: str | None) -> None:
     """Connect a sync target (github-gist, local, git)."""
     from ..sync import SyncEndpoint, SyncTarget, get_sync_engine
 
@@ -309,9 +312,7 @@ def sync_connect(
 
     target = target_map.get(target_type.lower())
     if not target:
-        click.echo(
-            f"Unknown target type: {target_type}. Valid: {', '.join(target_map.keys())}", err=True
-        )
+        click.echo(f"Unknown target type: {target_type}. Valid: {', '.join(target_map.keys())}", err=True)
         return
 
     engine = get_sync_engine()
@@ -609,9 +610,7 @@ def setup_cmd(
     config: NexusConfig = ctx.obj["config"]
 
     # Auto-detect Termux
-    is_termux = os.path.exists(
-        "/data/data/com.termux/files/usr/bin/termux-audio"
-    ) or os.environ.get("TERMUX_VERSION")
+    is_termux = os.path.exists("/data/data/com.termux/files/usr/bin/termux-audio") or os.environ.get("TERMUX_VERSION")
 
     # Banner
     click.echo("\n" + "=" * 50)
@@ -626,6 +625,7 @@ def setup_cmd(
     # --- Provider selection ---
     if not provider:
         from .onboarding import OnboardingManager
+
         manager = OnboardingManager(config)
         manager.run()
         # After onboarding, we need to extract the selected provider for the rest of the function
@@ -701,9 +701,7 @@ def test_provider_connection(provider: str, model: str, api_key: str, base_url: 
             return {"ok": False, "error": f"Unknown provider: {provider}"}
 
         with httpx.Client(timeout=10.0) as client:
-            resp = client.post(
-                url, json=payload, headers=headers, params=params if provider == "google" else None
-            )
+            resp = client.post(url, json=payload, headers=headers, params=params if provider == "google" else None)
 
         if resp.status_code == 200:
             return {"ok": True}
@@ -839,9 +837,7 @@ def doctor(ctx: click.Context) -> None:
 
         le = get_learning_engine()
         stats = le.get_stats()
-        click.echo(
-            f"  [+] Learning engine: {stats['total_lessons']} lessons, {stats['total_failures']} failures"
-        )
+        click.echo(f"  [+] Learning engine: {stats['total_lessons']} lessons, {stats['total_failures']} failures")
     except Exception as e:
         click.echo(f"  [!] Learning engine error: {e}")
 
@@ -890,9 +886,7 @@ def doctor(ctx: click.Context) -> None:
 
         engine = get_voice_engine()
         voices = list_tts_voices()
-        click.echo(
-            f"  [+] Voice: TTS={engine.config.tts_provider} ({len(voices)} voices), STT={engine.config.stt_provider}"
-        )
+        click.echo(f"  [+] Voice: TTS={engine.config.tts_provider} ({len(voices)} voices), STT={engine.config.stt_provider}")
     except Exception as e:
         click.echo(f"  [!] Voice system error: {e}")
 
@@ -937,6 +931,7 @@ def dashboard(ctx: click.Context, port: int, host: str, open: bool) -> None:
     click.echo("Press Ctrl+C to stop")
     app.run(host=host, port=port, debug=False)
 
+
 # TUI command
 @cli.command()
 @click.pass_context
@@ -946,6 +941,7 @@ def tui(ctx: click.Context) -> None:
         return
 
     from .welcome import display_welcome
+
     display_welcome()
 
     from ..tui.app import NexusTUI
@@ -959,9 +955,7 @@ def tui(ctx: click.Context) -> None:
 @click.option("--tts", "tts_override", help="TTS provider override (e.g., freetts, openai)")
 @click.option("--stt", "stt_override", help="STT provider override (e.g., whisper, assemblyai)")
 @click.option("--voice", "voice_override", help="Voice name (e.g., en-US-Neural2-F)")
-@click.option(
-    "--continuous", is_flag=True, default=False, help="Keep listening after each response"
-)
+@click.option("--continuous", is_flag=True, default=False, help="Keep listening after each response")
 @click.pass_context
 def voice(
     ctx: click.Context,
@@ -992,10 +986,11 @@ def voice(
         return
 
     if stt_override == "whisper" or (not stt_override and "whisper" in str(ctx.obj.get("config", {}))):
-         if not ensure_dependency("faster-whisper"):
-             return
+        if not ensure_dependency("faster-whisper"):
+            return
 
     from .welcome import display_welcome
+
     display_welcome()
 
     import asyncio
@@ -1069,6 +1064,7 @@ def repl(ctx: click.Context) -> None:
     Use /help inside the REPL for available slash commands.
     """
     from .welcome import display_welcome
+
     display_welcome()
 
     from ..cli.repl import run_repl
@@ -1122,9 +1118,7 @@ def automation_status() -> None:
     click.echo("\nAutomation Status:\n")
 
     click.echo(f"  Playwright:     {'[+] installed' if PLAYWRIGHT_AVAILABLE else '[-] not installed'}")
-    click.echo(
-        f"  Chromium:       {'[+] available' if is_browser_available() else '[-] not installed (run: nexus automation install-browser)'}"
-    )
+    click.echo(f"  Chromium:       {'[+] available' if is_browser_available() else '[-] not installed (run: nexus automation install-browser)'}")
 
     if PLAYWRIGHT_AVAILABLE:
         click.echo("\n  Browser:        Configured for stealth/anti-detection")
@@ -1138,9 +1132,7 @@ def automation_status() -> None:
 
 
 @automation.command("install-browser")
-@click.option(
-    "--browser", default="chromium", help="Browser to install (chromium, firefox, webkit)"
-)
+@click.option("--browser", default="chromium", help="Browser to install (chromium, firefox, webkit)")
 @click.option("--with-deps", is_flag=True, default=False, help="Install system dependencies")
 def automation_install_browser(browser: str, with_deps: bool) -> None:
     """Install browser for automation. Run this once on a new machine."""
@@ -1170,6 +1162,7 @@ def automation_install_browser(browser: str, with_deps: bool) -> None:
 def initialize_providers(config) -> None:
     """Initialize providers from configuration."""
     from nexus.providers import get_manager
+
     manager = get_manager()
     for _name, cfg in config.providers.items():
         manager.add_provider(cfg)
@@ -1186,6 +1179,7 @@ def main():
         return
 
     from nexus.config import load_config
+
     # Load config and initialize
     config = load_config()
     config.ensure_dirs()
@@ -1193,6 +1187,7 @@ def main():
     # Check for providers
     if not config.providers:
         from nexus.doctor import run_doctor
+
         # If we are in the main CLI (not tui/voice/repl), assume interactive unless --non-interactive
         is_interactive = sys.stdin.isatty() and "--non-interactive" not in sys.argv
         run_doctor(interactive=is_interactive)

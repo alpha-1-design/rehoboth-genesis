@@ -10,6 +10,7 @@ class PerformanceMetrics:
     tool_failures: int = 0
     success_rate: float = 1.0
 
+
 class ReflectionEngine:
     """Evaluates task execution and suggests self-optimizations."""
 

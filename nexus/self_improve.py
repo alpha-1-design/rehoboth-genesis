@@ -21,6 +21,7 @@ from typing import Any
 @dataclass
 class Improvement:
     """A self-written improvement."""
+
     improvement_id: str
     created_at: datetime
     title: str
@@ -54,13 +55,13 @@ class Improvement:
 class SelfImprovementAgent:
     """
     Nexus's self-improvement system.
-    
+
     Works alongside the learning engine:
       learn.record_failure() → learn.get_applicable_lessons()
                             → self_improver.suggest_improvement()
                             → improvement written to ~/.nexus/improvements/
                             → user approves → applied
-    
+
     Also proactively suggests improvements based on:
       - Repeated failure patterns
       - User preferences (learned from corrections)
@@ -289,17 +290,19 @@ class SelfImprovementAgent:
                 lines.append(f"    - {f['tool']}: {f['error'][:50]}...")
 
         # Suggestions
-        lines.extend([
-            "",
-            "  I can run a self-improvement loop that will:",
-            "",
-            "    📝 Analyze my approach and identify patterns",
-            "    🛠️  Write helper scripts for repeated tasks",
-            "    📖 Improve my understanding of this project",
-            "    🔧 Suggest tool/prompt improvements",
-            "    📚 Update my lessons from today's failures",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "  I can run a self-improvement loop that will:",
+                "",
+                "    📝 Analyze my approach and identify patterns",
+                "    🛠️  Write helper scripts for repeated tasks",
+                "    📖 Improve my understanding of this project",
+                "    🔧 Suggest tool/prompt improvements",
+                "    📚 Update my lessons from today's failures",
+                "",
+            ]
+        )
 
         # Show existing improvements
         applied = [i for i in self._improvements if i.status == "applied"]
@@ -308,10 +311,12 @@ class SelfImprovementAgent:
             for i in applied[-3:]:
                 lines.append(f"    • {i.title}")
 
-        lines.extend([
-            "",
-            "  Run self-improvement loop? (yes/no): ",
-        ])
+        lines.extend(
+            [
+                "",
+                "  Run self-improvement loop? (yes/no): ",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -350,8 +355,7 @@ class SelfImprovementAgent:
             imp = self.suggest_improvement(
                 improvement_type="helper",
                 title=f"Handler: {most_common_error}",
-                description=f"Auto-generated handler for {most_common_error} errors. "
-                           f"Occurred {error_types[most_common_error]} times this session.",
+                description=f"Auto-generated handler for {most_common_error} errors. Occurred {error_types[most_common_error]} times this session.",
                 code=code,
                 trigger=f"error_type:{most_common_error}",
             )
@@ -363,8 +367,7 @@ class SelfImprovementAgent:
             imp = self.suggest_improvement(
                 improvement_type="helper",
                 title="Project Helper Script",
-                description="Auto-generated helper tailored to this project's patterns. "
-                           "Created based on repeated interactions.",
+                description="Auto-generated helper tailored to this project's patterns. Created based on repeated interactions.",
                 code=project_helper,
                 trigger=f"context:{task_context[:50]}",
             )

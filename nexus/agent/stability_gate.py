@@ -60,9 +60,7 @@ class StabilityGate:
 
             files = glob.glob("src/nexus/**/*.py", recursive=True)
             for f in files:
-                subprocess.run(
-                    [sys.executable, "-m", "py_compile", f], check=True, capture_output=True
-                )
+                subprocess.run([sys.executable, "-m", "py_compile", f], check=True, capture_output=True)
             return True, "All files compile."
         except subprocess.CalledProcessError as e:
             return False, e.stderr.decode()
@@ -95,9 +93,7 @@ class StabilityGate:
         try:
             env = os.environ.copy()
             env["PYTHONPATH"] = f"{self.workspace}/src"
-            result = subprocess.run(
-                ["pytest", "tests/"], capture_output=True, text=True, env=env, timeout=60
-            )
+            result = subprocess.run(["pytest", "tests/"], capture_output=True, text=True, env=env, timeout=60)
             return result.returncode == 0, result.stdout or result.stderr
         except Exception as e:
             return False, str(e)

@@ -167,10 +167,7 @@ class CircuitBreaker:
                     self._state = CircuitState.OPEN
                     self._opened_at = time.time()
                     self.stats.state_changes += 1
-                    logger.warning(
-                        f"Circuit breaker '{self.name}' OPENED after "
-                        f"{self._failure_count} consecutive failures"
-                    )
+                    logger.warning(f"Circuit breaker '{self.name}' OPENED after {self._failure_count} consecutive failures")
 
     def reset(self) -> None:
         """Manually reset the circuit breaker to CLOSED."""
@@ -189,21 +186,12 @@ class CircuitBreaker:
             "failure_count": self._failure_count,
             "success_count": self._success_count,
             "total_calls": self.stats.total_calls,
-            "failure_rate": (
-                self.stats.failed_calls / self.stats.total_calls
-                if self.stats.total_calls > 0
-                else 0.0
-            ),
-            "avg_execution_time": (
-                self.stats.total_execution_time / self.stats.total_calls
-                if self.stats.total_calls > 0
-                else 0.0
-            ),
+            "failure_rate": (self.stats.failed_calls / self.stats.total_calls if self.stats.total_calls > 0 else 0.0),
+            "avg_execution_time": (self.stats.total_execution_time / self.stats.total_calls if self.stats.total_calls > 0 else 0.0),
             "consecutive_failures": self.stats.consecutive_failures,
             "last_failure": self.stats.last_failure,
             "last_success": self.stats.last_success,
-            "is_healthy": self.state == CircuitState.CLOSED
-            and self.stats.consecutive_failures == 0,
+            "is_healthy": self.state == CircuitState.CLOSED and self.stats.consecutive_failures == 0,
         }
 
 
@@ -288,11 +276,7 @@ class ToolCircuitBreakerManager:
 
         reports = self.get_all_health()
         healthy = sum(1 for r in reports.values() if r["is_healthy"])
-        degraded = sum(
-            1
-            for r in reports.values()
-            if not r["is_healthy"] and r["state"] == "HALF_OPEN"
-        )
+        degraded = sum(1 for r in reports.values() if not r["is_healthy"] and r["state"] == "HALF_OPEN")
         failed = sum(1 for r in reports.values() if r["state"] == "OPEN")
 
         return {

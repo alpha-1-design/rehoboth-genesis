@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 
 try:
     import httpx
+
     HTTPX_AVAILABLE = True
 except ImportError:
     HTTPX_AVAILABLE = False
@@ -26,6 +27,7 @@ REALISTIC_USER_AGENTS = [
 @dataclass
 class ApiRequest:
     """Represents an API request."""
+
     method: str = "GET"
     url: str = ""
     headers: dict[str, str] = field(default_factory=dict)
@@ -42,18 +44,20 @@ class ApiAutomation:
     """API automation client with session, cookie management, and anti-detection."""
 
     base_url: str = ""
-    headers: dict[str, str] = field(default_factory=lambda: {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
-    })
+    headers: dict[str, str] = field(
+        default_factory=lambda: {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
+        }
+    )
     cookies: dict[str, str] = field(default_factory=dict)
     auth: tuple[str, str] | None = None
     timeout: int = 30
@@ -202,18 +206,18 @@ class ApiAutomation:
         """Make a DELETE request."""
         return await self.request(ApiRequest(method="DELETE", url=url, **kwargs))
 
-    async def fill_form(self, url: str, form_data: dict[str, Any],
-                        method: str = "POST") -> dict[str, Any]:
+    async def fill_form(self, url: str, form_data: dict[str, Any], method: str = "POST") -> dict[str, Any]:
         """Submit form data to a URL."""
-        return await self.request(ApiRequest(
-            method=method,
-            url=url,
-            data=form_data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        ))
+        return await self.request(
+            ApiRequest(
+                method=method,
+                url=url,
+                data=form_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+        )
 
-    async def upload(self, url: str, files: dict[str, Any],
-                     data: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def upload(self, url: str, files: dict[str, Any], data: dict[str, Any] | None = None) -> dict[str, Any]:
         """Upload files to a URL."""
         client = await self._get_client()
 
@@ -237,10 +241,9 @@ class ApiAutomation:
             "json": response.json() if "json" in response.headers.get("content-type", "") else None,
         }
 
-    async def login(self, url: str, username: str, password: str,
-                    username_field: str = "username",
-                    password_field: str = "password",
-                    submit_field: str = "submit") -> dict[str, Any]:
+    async def login(
+        self, url: str, username: str, password: str, username_field: str = "username", password_field: str = "password", submit_field: str = "submit"
+    ) -> dict[str, Any]:
         """Perform login to a website."""
         client = await self._get_client()
 
@@ -260,11 +263,13 @@ class ApiAutomation:
 
         form_data = {username_field: username, password_field: password}
 
-        return await self.request(ApiRequest(
-            method=form_method,
-            url=urljoin(url, form_action),
-            data=form_data,
-        ))
+        return await self.request(
+            ApiRequest(
+                method=form_method,
+                url=urljoin(url, form_action),
+                data=form_data,
+            )
+        )
 
     async def extract_from_html(self, html: str, pattern: str) -> list[str]:
         """Extract text from HTML using regex pattern."""
@@ -284,7 +289,7 @@ class ApiAutomation:
         """Extract all forms from HTML."""
         forms = []
 
-        form_pattern = r'<form([^>]*)>(.*?)</form>'
+        form_pattern = r"<form([^>]*)>(.*?)</form>"
         for form_tag, form_content in re.findall(form_pattern, html, re.DOTALL | re.IGNORECASE):
             form_info = {"action": "", "method": "GET", "fields": {}}
 
@@ -328,14 +333,10 @@ class ApiFlow:
     @staticmethod
     async def github_login(api: ApiAutomation, token: str) -> dict[str, Any]:
         """GitHub API authentication."""
-        return await api.get(
-            "https://api.github.com/user",
-            headers={"Authorization": f"token {token}"}
-        )
+        return await api.get("https://api.github.com/user", headers={"Authorization": f"token {token}"})
 
     @staticmethod
-    async def twitter_post(api: ApiAutomation, text: str,
-                           bearer_token: str) -> dict[str, Any]:
+    async def twitter_post(api: ApiAutomation, text: str, bearer_token: str) -> dict[str, Any]:
         """Post a tweet via Twitter API v2."""
         return await api.post(
             "https://api.twitter.com/2/tweets",
@@ -347,8 +348,7 @@ class ApiFlow:
         )
 
     @staticmethod
-    async def discord_message(api: ApiAutomation, webhook_url: str,
-                              content: str) -> dict[str, Any]:
+    async def discord_message(api: ApiAutomation, webhook_url: str, content: str) -> dict[str, Any]:
         """Send a Discord webhook message."""
         return await api.post(
             webhook_url,
@@ -357,8 +357,7 @@ class ApiFlow:
         )
 
     @staticmethod
-    async def slack_webhook(api: ApiAutomation, webhook_url: str,
-                            text: str, blocks: list | None = None) -> dict[str, Any]:
+    async def slack_webhook(api: ApiAutomation, webhook_url: str, text: str, blocks: list | None = None) -> dict[str, Any]:
         """Send a Slack webhook message."""
         payload = {"text": text}
         if blocks:

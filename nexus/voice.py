@@ -46,6 +46,7 @@ class VoiceConfig:
 # TTS Providers
 # ─────────────────────────────────────────────────────────────
 
+
 class TTSProvider(ABC):
     @abstractmethod
     async def speak(self, text: str, config: VoiceConfig) -> bytes:
@@ -68,13 +69,21 @@ class FreeTTSProvider(TTSProvider):
 
     BASE_URL = "https://freetts.org/api"
     VOICES = [
-        "en-US-JennyNeural", "en-US-GuyNeural", "en-US-AriaNeural",
-        "en-GB-SoniaNeural", "en-GB-RyanNeural",
-        "en-AU-NatashaNeural", "en-AU-WilliamNeural",
-        "de-DE-KatjaNeural", "fr-FR-DeniseNeural",
-        "es-ES-ElviraNeural", "it-IT-ElsaNeural",
-        "pt-BR-FranciscaNeural", "ja-JP-NanamiNeural",
-        "ko-KR-SunHiNeural", "zh-CN-XiaoxiaoNeural",
+        "en-US-JennyNeural",
+        "en-US-GuyNeural",
+        "en-US-AriaNeural",
+        "en-GB-SoniaNeural",
+        "en-GB-RyanNeural",
+        "en-AU-NatashaNeural",
+        "en-AU-WilliamNeural",
+        "de-DE-KatjaNeural",
+        "fr-FR-DeniseNeural",
+        "es-ES-ElviraNeural",
+        "it-IT-ElsaNeural",
+        "pt-BR-FranciscaNeural",
+        "ja-JP-NanamiNeural",
+        "ko-KR-SunHiNeural",
+        "zh-CN-XiaoxiaoNeural",
     ]
 
     async def speak(self, text: str, config: VoiceConfig) -> bytes:
@@ -119,6 +128,7 @@ class FreeTTSProvider(TTSProvider):
                 import pyaudio
             except ImportError:
                 from .utils.dependencies import ensure_dependency
+
                 if not ensure_dependency("pyaudio"):
                     print("[TTS] Audio playback skipped (PyAudio not installed)")
                     return
@@ -157,6 +167,7 @@ class OpenAITTSProvider(TTSProvider):
 
     async def speak(self, text: str, config: VoiceConfig) -> bytes:
         from openai import AsyncOpenAI
+
         client = AsyncOpenAI(api_key=config.tts_api_key)
         response = await client.audio.speech.create(
             model="gpt-4o-mini-tts",
@@ -173,6 +184,7 @@ class OpenAITTSProvider(TTSProvider):
     async def play_audio(self, audio: bytes, config: VoiceConfig) -> None:
         try:
             import pyaudio
+
             wav = self._mp3_to_wav(audio)
             pa = pyaudio.PyAudio()
             stream = pa.open(format=pyaudio.paInt16, channels=1, rate=24000, output=True)
@@ -186,6 +198,7 @@ class OpenAITTSProvider(TTSProvider):
     def _mp3_to_wav(self, mp3_data: bytes) -> bytes:
         try:
             from pydub import AudioSegment
+
             audio = AudioSegment.from_mp3(io.BytesIO(mp3_data))
             buf = io.BytesIO()
             audio.export(buf, format="wav")
@@ -199,10 +212,12 @@ class SystemTTSProvider(TTSProvider):
 
     async def speak(self, text: str, config: VoiceConfig) -> bytes:
         import subprocess
+
         try:
             result = subprocess.run(
                 ["espeak", "-w", "/dev/stdout", "-s", "160", text],
-                capture_output=True, timeout=10,
+                capture_output=True,
+                timeout=10,
             )
             if result.returncode == 0 and result.stdout:
                 return result.stdout
@@ -214,7 +229,8 @@ class SystemTTSProvider(TTSProvider):
                 wav_path = f.name
             subprocess.run(
                 ["pico2wave", "-w", wav_path, text],
-                capture_output=True, timeout=10,
+                capture_output=True,
+                timeout=10,
             )
             with open(wav_path, "rb") as f:
                 data = f.read()
@@ -230,6 +246,7 @@ class SystemTTSProvider(TTSProvider):
     async def play_audio(self, audio: bytes, config: VoiceConfig) -> None:
         try:
             import pyaudio
+
             pa = pyaudio.PyAudio()
             stream = pa.open(format=pyaudio.paInt16, channels=1, rate=22050, output=True)
             stream.write(audio)
@@ -244,6 +261,7 @@ class SystemTTSProvider(TTSProvider):
 # STT Providers
 # ─────────────────────────────────────────────────────────────
 
+
 class STTProvider(ABC):
     @abstractmethod
     async def transcribe(self, audio: bytes, config: VoiceConfig) -> str:
@@ -256,6 +274,7 @@ class STTProvider(ABC):
             import pyaudio
         except ImportError:
             from .utils.dependencies import ensure_dependency
+
             if not ensure_dependency("pyaudio"):
                 raise NexusError("PyAudio is required for voice listening but is not installed.")
             import pyaudio
@@ -283,8 +302,7 @@ class STTProvider(ABC):
         try:
             while True:
                 data = stream.read(1024, exception_on_overflow=False)
-                amplitude = max(abs(int.from_bytes(data[i:i+2], "little", signed=True))
-                                for i in range(0, len(data) - 1, 2))
+                amplitude = max(abs(int.from_bytes(data[i : i + 2], "little", signed=True)) for i in range(0, len(data) - 1, 2))
                 frames.append(data)
 
                 now = asyncio.get_event_loop().time()
@@ -318,6 +336,7 @@ class STTProvider(ABC):
             import pyaudio
         except ImportError:
             from .utils.dependencies import ensure_dependency
+
             if not ensure_dependency("pyaudio"):
                 raise NexusError("PyAudio is required for voice listening but is not installed.")
             import pyaudio
@@ -345,10 +364,7 @@ class STTProvider(ABC):
         try:
             while True:
                 data = stream.read(512, exception_on_overflow=False)
-                amplitude = max(
-                    abs(int.from_bytes(data[i:i+2], "little", signed=True))
-                    for i in range(0, len(data) - 1, 2)
-                ) if len(data) >= 2 else 0
+                amplitude = max(abs(int.from_bytes(data[i : i + 2], "little", signed=True)) for i in range(0, len(data) - 1, 2)) if len(data) >= 2 else 0
 
                 now = asyncio.get_event_loop().time()
 
@@ -394,6 +410,7 @@ class AssemblyAISTTProvider(STTProvider):
 
     async def transcribe(self, audio: bytes, config: VoiceConfig) -> str:
         import httpx
+
         api_key = config.stt_api_key or os.environ.get("ASSEMBLYAI_API_KEY", "")
         if not api_key:
             raise ValueError("ASSEMBLYAI_API_KEY required for AssemblyAI STT")
@@ -437,6 +454,7 @@ class DeepgramSTTProvider(STTProvider):
 
     async def transcribe(self, audio: bytes, config: VoiceConfig) -> str:
         import httpx
+
         api_key = config.stt_api_key or os.environ.get("DEEPGRAM_API_KEY", "")
         if not api_key:
             raise ValueError("DEEPGRAM_API_KEY required for Deepgram STT")
@@ -465,6 +483,7 @@ class WhisperSTTProvider(STTProvider):
             from faster_whisper import WhisperModel
         except ImportError:
             import whisper
+
             model = whisper.load_model("base")
 
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -487,6 +506,7 @@ class FreeTTSSTTProvider(STTProvider):
 
     async def transcribe(self, audio: bytes, config: VoiceConfig) -> str:
         import httpx
+
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             f.write(audio)
             wav_path = f.name
@@ -508,6 +528,7 @@ class FreeTTSSTTProvider(STTProvider):
 # ─────────────────────────────────────────────────────────────
 # Voice Engine
 # ─────────────────────────────────────────────────────────────
+
 
 class VoiceEngine:
     """

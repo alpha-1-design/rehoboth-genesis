@@ -74,8 +74,7 @@ class PluginBase:
     def on_agent_spawn(self, agent_config: dict, ctx: dict) -> dict:
         return agent_config
 
-    def on_provider_error(self, provider_name: str, error: Exception,
-                          ctx: dict) -> tuple[bool, Any]:
+    def on_provider_error(self, provider_name: str, error: Exception, ctx: dict) -> tuple[bool, Any]:
         return False, None
 
     def on_session_start(self, session_id: str, ctx: dict) -> None:
@@ -95,9 +94,7 @@ class PluginManager:
     def __init__(self, plugins_dir: Path | None = None):
         self.plugins_dir = plugins_dir or (Path.home() / ".nexus" / "plugins")
         self._plugins: dict[str, Plugin] = {}
-        self._hooks: dict[PluginHook, list[tuple[str, Callable]]] = {
-            h: [] for h in PluginHook
-        }
+        self._hooks: dict[PluginHook, list[tuple[str, Callable]]] = {h: [] for h in PluginHook}
         self._enabled: dict[str, bool] = {}
 
     def discover(self) -> list[Plugin]:
@@ -141,17 +138,13 @@ class PluginManager:
 
         if init_file.exists():
             try:
-                spec = importlib.util.spec_from_file_location(
-                    f"nexus_plugin_{plugin_dir.name}", init_file
-                )
+                spec = importlib.util.spec_from_file_location(f"nexus_plugin_{plugin_dir.name}", init_file)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     for attr_name in dir(module):
                         attr = getattr(module, attr_name)
-                        if (isinstance(attr, type) and
-                                issubclass(attr, PluginBase) and
-                                attr is not PluginBase):
+                        if isinstance(attr, type) and issubclass(attr, PluginBase) and attr is not PluginBase:
                             instance = attr()
                             break
                     if not instance:
@@ -242,6 +235,7 @@ def get_plugin_manager() -> PluginManager:
     global _plugin_manager
     if _plugin_manager is None:
         from ..config import load_config
+
         cfg = load_config()
         _plugin_manager = PluginManager(plugins_dir=cfg.plugins_dir)
         _plugin_manager.discover()

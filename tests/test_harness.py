@@ -11,6 +11,7 @@ def test_safety_engine_initialization():
     safety = get_safety_engine()
     assert safety.get_mode() == SafetyMode.USER_REVIEW
 
+
 def test_safety_mode_switching():
     """Verify that switching safety modes updates the Harness state."""
     safety = get_safety_engine()
@@ -21,6 +22,7 @@ def test_safety_mode_switching():
     safety.set_mode(SafetyMode.USER_REVIEW)
     assert safety.get_mode() == SafetyMode.USER_REVIEW
 
+
 def test_read_before_edit_rule():
     """Verify that the Harness enforces the 'Read Before Edit' rule."""
     safety = get_safety_engine()
@@ -30,6 +32,7 @@ def test_read_before_edit_rule():
 
     # It should have at least one violation for reading before editing
     assert any(v.rule.id == "read-before-edit" for v in violations)
+
 
 @pytest.mark.asyncio
 async def test_refiners_fire_syntax_check(tmp_path):
@@ -43,6 +46,7 @@ async def test_refiners_fire_syntax_check(tmp_path):
     passed, error = await repl._run_refiners_fire(str(bad_file))
     assert passed is False
     assert "Syntax Error" in error
+
 
 @pytest.mark.asyncio
 async def test_refiners_fire_solid_work(tmp_path):

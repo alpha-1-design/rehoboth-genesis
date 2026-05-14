@@ -11,11 +11,7 @@ class NexusSteward:
 
     def __init__(self, workspace: Path):
         self.workspace = workspace
-        self.secrets_patterns = [
-            re.compile(r"(sk-[a-zA-Z0-9]{20,})"),
-            re.compile(r"(ghp_[a-zA-Z0-9]{36})"),
-            re.compile(r"(AIza[0-9A-Za-z-_]{35})")
-        ]
+        self.secrets_patterns = [re.compile(r"(sk-[a-zA-Z0-9]{20,})"), re.compile(r"(ghp_[a-zA-Z0-9]{36})"), re.compile(r"(AIza[0-9A-Za-z-_]{35})")]
 
     def _is_git_repo(self) -> bool:
         return (self.workspace / ".git").exists()

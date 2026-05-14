@@ -37,8 +37,10 @@ class NeuralCore:
         self.shadow.stop()
         print("[CORE] Governance offline.")
 
+
 # Global instance
 _core: NeuralCore | None = None
+
 
 def get_core() -> NeuralCore:
     global _core

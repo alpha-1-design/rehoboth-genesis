@@ -17,10 +17,10 @@ from typing import Any
 
 
 class RuleLevel(Enum):
-    BLOCK = auto()      # Halt and require user intervention
-    WARN = auto()       # Print warning, continue if user confirms
-    SKIP = auto()       # Skip the operation entirely
-    NOTE = auto()       # Just log and continue
+    BLOCK = auto()  # Halt and require user intervention
+    WARN = auto()  # Print warning, continue if user confirms
+    SKIP = auto()  # Skip the operation entirely
+    NOTE = auto()  # Just log and continue
 
 
 class RuleCategory(Enum):
@@ -35,18 +35,20 @@ class RuleCategory(Enum):
 
 class SafetyMode(Enum):
     """Granular safety modes for Nexus."""
-    READ_ONLY = "read_only"             # Only allow read/list/glob/grep
-    SENSITIVE_WRITE = "sensitive"       # Confirm all modifications, block destructive
-    AUTO_GIT = "auto_git"               # Auto-approve non-destructive git, confirm others
-    LOCAL_SANDBOX = "sandbox"           # Restrict execution to a specific directory
-    USER_REVIEW = "user_review"         # Default: confirm dangerous tools
-    UNRESTRICTED = "unrestricted"       # No safety checks (not recommended)
-    STRICT = "strict"                   # All warnings are blocks, strict execution order
+
+    READ_ONLY = "read_only"  # Only allow read/list/glob/grep
+    SENSITIVE_WRITE = "sensitive"  # Confirm all modifications, block destructive
+    AUTO_GIT = "auto_git"  # Auto-approve non-destructive git, confirm others
+    LOCAL_SANDBOX = "sandbox"  # Restrict execution to a specific directory
+    USER_REVIEW = "user_review"  # Default: confirm dangerous tools
+    UNRESTRICTED = "unrestricted"  # No safety checks (not recommended)
+    STRICT = "strict"  # All warnings are blocks, strict execution order
 
 
 @dataclass
 class Rule:
     """A single safety rule."""
+
     id: str
     name: str
     description: str
@@ -86,6 +88,7 @@ class Rule:
 @dataclass
 class RuleViolation:
     """A rule was triggered."""
+
     rule: Rule
     context: dict[str, Any]
     severity: str
@@ -96,6 +99,7 @@ class RuleViolation:
 @dataclass
 class ExecutionStep:
     """A step in the mandatory execution order."""
+
     name: str
     required: bool = True
     completed: bool = False
@@ -105,7 +109,7 @@ class ExecutionStep:
 class SafetyEngine:
     """
     The safety rules engine. Every tool call goes through this before execution.
-    
+
     Execution order enforcement:
       READ → RESEARCH → PLAN → CONFIRM → EXECUTE → VALIDATE → ROLLBACK
     """
@@ -273,6 +277,7 @@ class SafetyEngine:
     def mark_file_read(self, path: str) -> None:
         """Mark a file as having been read (satisfies read-before-edit)."""
         import os
+
         real = os.path.realpath(path)
         self._read_files.add(real)
         self._log("read", path=path)
@@ -280,6 +285,7 @@ class SafetyEngine:
     def was_file_read(self, path: str) -> bool:
         """Check if a file was read before editing."""
         import os
+
         real = os.path.realpath(path)
         return real in self._read_files
 
@@ -300,46 +306,55 @@ class SafetyEngine:
         if self._mode == SafetyMode.READ_ONLY:
             safe_tools = {"read", "list", "glob", "grep", "search", "web_fetch"}
             if tool.lower() not in safe_tools:
-                violations.append(RuleViolation(
-                    rule=Rule("mode-violation", "Read-Only Mode", "Modification tools are blocked in READ_ONLY mode", RuleCategory.SECURITY, RuleLevel.BLOCK),
-                    context=context,
-                    severity="BLOCK",
-                    message="READ_ONLY mode active. Modification tool blocked.",
-                ))
+                violations.append(
+                    RuleViolation(
+                        rule=Rule(
+                            "mode-violation", "Read-Only Mode", "Modification tools are blocked in READ_ONLY mode", RuleCategory.SECURITY, RuleLevel.BLOCK
+                        ),
+                        context=context,
+                        severity="BLOCK",
+                        message="READ_ONLY mode active. Modification tool blocked.",
+                    )
+                )
 
         # 2. LOCAL_SANDBOX Mode check
         if self._mode == SafetyMode.LOCAL_SANDBOX and self._sandbox_dir:
             if path and self._sandbox_dir not in path:
-                violations.append(RuleViolation(
-                    rule=Rule("sandbox-violation", "Sandbox Violation", f"Paths must be within {self._sandbox_dir}", RuleCategory.SECURITY, RuleLevel.BLOCK),
-                    context=context,
-                    severity="BLOCK",
-                    message=f"SANDBOX mode active. Access to {path} is blocked.",
-                ))
+                violations.append(
+                    RuleViolation(
+                        rule=Rule(
+                            "sandbox-violation", "Sandbox Violation", f"Paths must be within {self._sandbox_dir}", RuleCategory.SECURITY, RuleLevel.BLOCK
+                        ),
+                        context=context,
+                        severity="BLOCK",
+                        message=f"SANDBOX mode active. Access to {path} is blocked.",
+                    )
+                )
 
         # 3. AUTO_GIT Mode check (Special handling for git)
         if self._mode == SafetyMode.AUTO_GIT and tool == "git":
             safe_git = {"status", "diff", "log", "branch", "show"}
             cmd_parts = command.split()
             if cmd_parts and cmd_parts[0] in safe_git:
-                return [] # Auto-approve safe git commands
+                return []  # Auto-approve safe git commands
 
         # Standard rule checks
         for rule in self.rules.values():
             # Special case for EXECUTION_ORDER rules
             if rule.id == "read-before-edit" and tool in ("edit", "write"):
                 if not self.was_file_read(path):
-                    violations.append(RuleViolation(
-                        rule=rule,
-                        context=context,
-                        severity="BLOCK" if self._strict_mode else "WARN",
-                        message=f"[EXECUTION_ORDER] {rule.name}: {rule.description}",
-                    ))
+                    violations.append(
+                        RuleViolation(
+                            rule=rule,
+                            context=context,
+                            severity="BLOCK" if self._strict_mode else "WARN",
+                            message=f"[EXECUTION_ORDER] {rule.name}: {rule.description}",
+                        )
+                    )
                     continue
 
             if rule.matches(context):
-                sev = "BLOCK" if (rule.level == RuleLevel.BLOCK or
-                                  (self._strict_mode and rule.level == RuleLevel.WARN)) else rule.level.name
+                sev = "BLOCK" if (rule.level == RuleLevel.BLOCK or (self._strict_mode and rule.level == RuleLevel.WARN)) else rule.level.name
                 violation = RuleViolation(
                     rule=rule,
                     context=context,
@@ -413,11 +428,14 @@ class SafetyEngine:
     def _log(self, event: str, **kwargs) -> None:
         """Internal logging."""
         from datetime import datetime
-        self._execution_log.append({
-            "event": event,
-            "timestamp": datetime.now().isoformat(),
-            **kwargs,
-        })
+
+        self._execution_log.append(
+            {
+                "event": event,
+                "timestamp": datetime.now().isoformat(),
+                **kwargs,
+            }
+        )
 
     def _trigger_hook(self, hook: str, *args) -> None:
         """Trigger registered hooks."""

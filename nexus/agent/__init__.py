@@ -7,6 +7,7 @@ from .orchestrator import AgentConfig, AgentOrchestrator, Turn
 
 _orchestrator: AgentOrchestrator | None = None
 
+
 def get_orchestrator() -> AgentOrchestrator:
     """Get or create the singleton agent orchestrator."""
     global _orchestrator
@@ -17,5 +18,6 @@ def get_orchestrator() -> AgentOrchestrator:
             memory=get_memory(),
         )
     return _orchestrator
+
 
 __all__ = ["AgentOrchestrator", "AgentConfig", "Turn", "get_orchestrator"]

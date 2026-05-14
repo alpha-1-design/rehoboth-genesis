@@ -14,11 +14,11 @@ from enum import Enum, auto
 
 
 class PersonalityMode(Enum):
-    PARTNER = auto()      # Co-worker mode (default)
-    FOCUSED = auto()       # Minimal, get-to-the-point mode
-    TUTOR = auto()         # Teaching/explanatory mode
-    RESCUE = auto()        # Debugging/emergency mode
-    EXPLORE = auto()       # Learning/research mode
+    PARTNER = auto()  # Co-worker mode (default)
+    FOCUSED = auto()  # Minimal, get-to-the-point mode
+    TUTOR = auto()  # Teaching/explanatory mode
+    RESCUE = auto()  # Debugging/emergency mode
+    EXPLORE = auto()  # Learning/research mode
 
 
 @dataclass
@@ -132,60 +132,72 @@ class Personality:
 
     def greet(self) -> str:
         import random
+
         return random.choice(Voice.GREETINGS)
 
     def collaboration_intro(self) -> str:
         import random
+
         return random.choice(Voice.COLLABORATION)
 
     def uncertainty(self, topic: str) -> str:
         import random
+
         return random.choice(Voice.UNCERTAINTY).format(topic=topic)
 
     def initiative(self, observation: str, suggestion: str) -> str:
         import random
-        return random.choice(Voice.INITIATIVE).format(
-            observation=observation, suggestion=suggestion
-        )
+
+        return random.choice(Voice.INITIATIVE).format(observation=observation, suggestion=suggestion)
 
     def fatal_warning(self) -> str:
         import random
+
         return random.choice(Voice.FATAL_MISTAKE_WARNING)
 
     def fatal_proceed(self) -> str:
         import random
+
         return random.choice(Voice.FATAL_MISTAKE_PROCEED)
 
     def fatal_block(self) -> str:
         import random
+
         return random.choice(Voice.FATAL_MISTAKE_BLOCK)
 
     def failure(self) -> str:
         import random
+
         return random.choice(Voice.FAILURE)
 
     def success(self) -> str:
         import random
+
         return random.choice(Voice.SUCCESS)
 
     def reflection_ask(self) -> str:
         import random
+
         return random.choice(Voice.REFLECTION_ASK)
 
     def learning(self) -> str:
         import random
+
         return random.choice(Voice.LEARNING_FROM_FAILURE)
 
     def no_idea(self) -> str:
         import random
+
         return random.choice(Voice.NO_IDEA)
 
     def welcome_back(self) -> str:
         import random
+
         return random.choice(Voice.WELCOME_BACK)
 
     def team_spawn(self, role: str) -> str:
         import random
+
         return random.choice(Voice.TEAM_SPAWN).format(role=role)
 
     def format_error_report(self, error: str, context: str, suggestion: str) -> str:
@@ -223,8 +235,7 @@ I'll start by understanding the scope, then I'll share my plan before we dive in
             "Use examples. Be thorough but strictly professional.",
             PersonalityMode.RESCUE: "You are Nexus in rescue mode. Debugging and emergency response. "
             "Stay calm. Prioritize diagnosis. Provide clear, actionable steps.",
-            PersonalityMode.EXPLORE: "You are Nexus exploring. Research and learning mode. "
-            "Share discoveries. Ask clarifying technical questions.",
+            PersonalityMode.EXPLORE: "You are Nexus exploring. Research and learning mode. Share discoveries. Ask clarifying technical questions.",
         }
 
         base = mode_descriptions.get(self.config.mode, mode_descriptions[PersonalityMode.PARTNER])

@@ -55,8 +55,10 @@ class BrowserManager:
 def get_browser_manager() -> BrowserManager:
     return BrowserManager.get_instance()
 
+
 try:
     from playwright.async_api import Browser, Page, async_playwright
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
@@ -65,6 +67,7 @@ except ImportError:
 @dataclass
 class BrowserConfig:
     """Configuration for browser automation."""
+
     headless: bool = True
     stealth: bool = True
     slow_mo: int = 0
@@ -138,6 +141,7 @@ def is_browser_available() -> bool:
         return False
     try:
         import os
+
         cache = os.path.expanduser("~/.cache/ms-playwright")
         if os.path.exists(cache):
             for item in os.listdir(cache):
@@ -154,6 +158,7 @@ def is_browser_available() -> bool:
 @dataclass
 class FormField:
     """Represents a form field to fill."""
+
     selector: str
     value: str
     field_type: str = "input"
@@ -165,9 +170,7 @@ class BrowserAutomation:
 
     def __init__(self, config: BrowserConfig | None = None):
         if not PLAYWRIGHT_AVAILABLE:
-            raise ImportError(
-                "Playwright not installed. Run: pip install playwright && playwright install chromium"
-            )
+            raise ImportError("Playwright not installed. Run: pip install playwright && playwright install chromium")
 
         self.config = config or BrowserConfig()
         self._playwright = None
@@ -265,8 +268,7 @@ class BrowserAutomation:
 
         return self
 
-    async def navigate(self, url: str, wait_until: str = "networkidle",
-                       timeout: int = 30000) -> str:
+    async def navigate(self, url: str, wait_until: str = "networkidle", timeout: int = 30000) -> str:
         """Navigate to a URL with anti-bot checks."""
         if not self._page:
             raise RuntimeError("Browser not started. Call start() first.")
@@ -320,9 +322,19 @@ class BrowserAutomation:
             return False, ""
 
         captcha_indicators = [
-            "g-recaptcha", "g-resp", "captcha", "challenge", "Challenge",
-            "cf-challenge", "h-captcha", "Turnstile", "arkose", "hcaptcha",
-            "data-sitekey", "recaptcha/api", "challenges.cloudflare.com",
+            "g-recaptcha",
+            "g-resp",
+            "captcha",
+            "challenge",
+            "Challenge",
+            "cf-challenge",
+            "h-captcha",
+            "Turnstile",
+            "arkose",
+            "hcaptcha",
+            "data-sitekey",
+            "recaptcha/api",
+            "challenges.cloudflare.com",
         ]
 
         content = await self._page.content()
@@ -505,7 +517,7 @@ class BrowserAutomation:
 
     async def solve_captcha(self, captcha_type: str = "image") -> str:
         """Attempt to solve a CAPTCHA. Returns instructions if manual solving needed.
-        
+
         Note: Most CAPTCHAs require human solving. This will attempt known
         strategies and fall back to manual instructions for the user.
         """
@@ -520,13 +532,14 @@ class BrowserAutomation:
             return "Cloudflare challenge — waiting for verification"
 
         if "recaptcha" in title.lower() or "g-recaptcha" in await self._page.content().lower():
-            return ("reCAPTCHA detected — manual solving required. "
-                    "Instructions: 1) Take screenshot, 2) Solve at 2captcha.com or "
-                    "anti-captcha.com, 3) Use the returned token with browser.evaluate()")
+            return (
+                "reCAPTCHA detected — manual solving required. "
+                "Instructions: 1) Take screenshot, 2) Solve at 2captcha.com or "
+                "anti-captcha.com, 3) Use the returned token with browser.evaluate()"
+            )
 
         if "hcaptcha" in await self._page.content().lower():
-            return ("hCaptcha detected — manual solving required. "
-                    "Use anti-captcha.com with site key")
+            return "hCaptcha detected — manual solving required. Use anti-captcha.com with site key"
 
         return "Unknown CAPTCHA type"
 

@@ -17,6 +17,7 @@ import yaml
 @dataclass
 class Skill:
     """A domain-specific skill loaded from a .md file."""
+
     name: str
     description: str
     content: str
@@ -31,6 +32,7 @@ class Skill:
 @dataclass
 class SkillsConfig:
     """Configuration for the skills system."""
+
     skills_dir: Path | None = None
     auto_load: bool = True
     max_skills: int = 50
@@ -237,7 +239,4 @@ class SkillsManager:
     def search(self, query: str) -> list[Skill]:
         """Search skills by name, description, or tags."""
         q = query.lower()
-        return [
-            s for s in self._loaded
-            if q in s.name.lower() or q in s.description.lower() or q in " ".join(s.tags).lower()
-        ]
+        return [s for s in self._loaded if q in s.name.lower() or q in s.description.lower() or q in " ".join(s.tags).lower()]

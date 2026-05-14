@@ -27,6 +27,7 @@ from ..tools.base import BaseTool, ToolDefinition, ToolResult
 @dataclass
 class MCPServerConfig:
     """Configuration for a single MCP server."""
+
     name: str
     command: str
     args: list[str] = field(default_factory=list)
@@ -39,6 +40,7 @@ class MCPServerConfig:
 @dataclass
 class MCPTool:
     """A tool exposed by an MCP server."""
+
     name: str
     description: str
     input_schema: dict[str, Any]
@@ -108,9 +110,7 @@ class MCPClient:
         await self._send_request(config.name, request)
         await self._send_notification(config.name, {"jsonrpc": "2.0", "method": "notifications/initialized"})
 
-        tools_response = await self._send_request(config.name, {
-            "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}
-        })
+        tools_response = await self._send_request(config.name, {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         for tool_data in tools_response.get("result", {}).get("tools", []):
             self._tools[f"{config.name}/{tool_data['name']}"] = MCPTool(
                 name=tool_data["name"],

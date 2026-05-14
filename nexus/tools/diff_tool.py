@@ -49,14 +49,9 @@ class InteractiveDiffTool(BaseTool):
             return ToolResult(
                 success=True,
                 content=f"PROPOSED_CHANGE\nPath: {path}\nDiff:\n{diff_text}",
-                metadata={
-                    "action": "require_approval",
-                    "path": path,
-                    "old_content": old_content,
-                    "new_content": new_content,
-                    "diff": diff_text
-                }
+                metadata={"action": "require_approval", "path": path, "old_content": old_content, "new_content": new_content, "diff": diff_text},
             )
         except Exception as e:
             from ..utils import sanitize_error
+
             return ToolResult(success=False, content="", error=sanitize_error(e))

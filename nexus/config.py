@@ -17,6 +17,7 @@ DEFAULT_MCP_DIR = DEFAULT_CONFIG_DIR / "mcp_servers"
 @dataclass
 class ProviderConfig:
     """Configuration for an AI provider."""
+
     name: str
     provider_type: str  # openai, anthropic, google, ollama, groq, deepseek, etc.
     api_key: str | None = None
@@ -44,6 +45,7 @@ class ProviderConfig:
 @dataclass
 class NexusConfig:
     """Main configuration for Nexus."""
+
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     active_provider: str = "openai"
     planner_model: str | None = None
@@ -97,9 +99,7 @@ class NexusConfig:
     def from_dict(cls, data: dict[str, Any]) -> "NexusConfig":
         config = cls()
         if "providers" in data:
-            config.providers = {
-                k: ProviderConfig(**v) for k, v in data["providers"].items()
-            }
+            config.providers = {k: ProviderConfig(**v) for k, v in data["providers"].items()}
         config.active_provider = data.get("active_provider", "openai")
         config.planner_model = data.get("planner_model")
         config.worker_model = data.get("worker_model")
@@ -140,7 +140,8 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
     # Auto-detect providers from env vars
     if os.environ.get("OPENAI_API_KEY"):
         config.providers["openai"] = ProviderConfig(
-            name="openai", provider_type="openai",
+            name="openai",
+            provider_type="openai",
             api_key=os.environ["OPENAI_API_KEY"],
             model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
         )
@@ -148,7 +149,8 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
 
     if os.environ.get("ANTHROPIC_API_KEY"):
         config.providers["anthropic"] = ProviderConfig(
-            name="anthropic", provider_type="anthropic",
+            name="anthropic",
+            provider_type="anthropic",
             api_key=os.environ["ANTHROPIC_API_KEY"],
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
         )
@@ -157,42 +159,48 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
 
     if os.environ.get("GOOGLE_API_KEY"):
         config.providers["google"] = ProviderConfig(
-            name="google", provider_type="google",
+            name="google",
+            provider_type="google",
             api_key=os.environ["GOOGLE_API_KEY"],
             model=os.environ.get("GOOGLE_MODEL", "gemini-2.0-flash"),
         )
 
     if os.environ.get("OLLAMA_HOST"):
         config.providers["ollama"] = ProviderConfig(
-            name="ollama", provider_type="ollama",
+            name="ollama",
+            provider_type="ollama",
             base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"),
             model=os.environ.get("OLLAMA_MODEL", "llama3"),
         )
 
     if os.environ.get("GROQ_API_KEY"):
         config.providers["groq"] = ProviderConfig(
-            name="groq", provider_type="groq",
+            name="groq",
+            provider_type="groq",
             api_key=os.environ["GROQ_API_KEY"],
             model=os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
         )
 
     if os.environ.get("DEEPSEEK_API_KEY"):
         config.providers["deepseek"] = ProviderConfig(
-            name="deepseek", provider_type="deepseek",
+            name="deepseek",
+            provider_type="deepseek",
             api_key=os.environ["DEEPSEEK_API_KEY"],
             model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
         )
 
     if os.environ.get("MISTRAL_API_KEY"):
         config.providers["mistral"] = ProviderConfig(
-            name="mistral", provider_type="mistral",
+            name="mistral",
+            provider_type="mistral",
             api_key=os.environ["MISTRAL_API_KEY"],
             model=os.environ.get("MISTRAL_MODEL", "mistral-large-latest"),
         )
 
     if os.environ.get("OPENCODE_ZEN_API_KEY"):
         config.providers["opencode-zen"] = ProviderConfig(
-            name="opencode-zen", provider_type="opencode-zen",
+            name="opencode-zen",
+            provider_type="opencode-zen",
             api_key=os.environ["OPENCODE_ZEN_API_KEY"],
             base_url="https://opencode.ai/zen/v1",
             model=os.environ.get("OPENCODE_ZEN_MODEL", "minimax-m2.5-free"),
@@ -202,7 +210,8 @@ def load_config(config_path: Path | None = None) -> NexusConfig:
 
     if os.environ.get("OPENCODE_GO_API_KEY"):
         config.providers["opencode-go"] = ProviderConfig(
-            name="opencode-go", provider_type="opencode-go",
+            name="opencode-go",
+            provider_type="opencode-go",
             api_key=os.environ["OPENCODE_GO_API_KEY"],
             base_url="https://opencode.ai/zen/go/v1",
             model=os.environ.get("OPENCODE_GO_MODEL", "kimi-k2.5"),

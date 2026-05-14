@@ -65,22 +65,15 @@ class NexusTUI(App):
         self._version = "0.1.0"
 
         from .. import __version__
+
         self._version = __version__
 
     def _on_orchestrator_event(self, event_type: str, data: Any):
         """Bridge orchestrator brain events to TUI state manager."""
         if event_type == "thinking":
-            self.state_manager.add_thinking_step(
-                data.get("number", 0),
-                data.get("description", ""),
-                data.get("details", "")
-            )
+            self.state_manager.add_thinking_step(data.get("number", 0), data.get("description", ""), data.get("details", ""))
         elif event_type == "agent_status":
-            self.state_manager.update_agent_status(
-                data.get("name"),
-                data.get("status"),
-                data.get("task")
-            )
+            self.state_manager.update_agent_status(data.get("name"), data.get("status"), data.get("task"))
 
     def compose(self) -> ComposeResult:
         """Create the layout."""
@@ -97,11 +90,11 @@ class NexusTUI(App):
 
         yield Footer()
 
-
     def _get_battery(self) -> int:
         """Get battery percentage if available."""
         try:
             import psutil
+
             battery = psutil.sensors_battery()
             if battery:
                 return battery.percent
@@ -119,17 +112,21 @@ class NexusTUI(App):
         import threading
 
         from ..memory.shadow import get_shadow_indexer
+
         self.shadow_indexer = get_shadow_indexer()
         threading.Thread(target=self.shadow_indexer.start, daemon=True).start()
 
         chat_panel = self.query_one("#chat-panel", ChatPanel)
-        chat_panel.add_message(ChatMessage(
-            role=MessageRole.SYSTEM,
-            content="Welcome to Nexus TUI! Type /help for available commands.",
-            timestamp=datetime.now(),
-        ))
+        chat_panel.add_message(
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content="Welcome to Nexus TUI! Type /help for available commands.",
+                timestamp=datetime.now(),
+            )
+        )
 
         self._update_status_bar()
+
     def _on_state_change(self, state: TUIState) -> None:
         """Handle state changes from the state manager."""
         self._update_status_bar()
@@ -158,11 +155,13 @@ class NexusTUI(App):
 
             # Check if agent status is noteworthy
             if agent.status == AgentStatus.THINKING:
-                chat_panel.add_message(ChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=f"Agent {agent.name} is {agent.status.name.lower()}: {agent.task if hasattr(agent, 'task') else agent.current_task}",
-                    timestamp=datetime.now(),
-                ))
+                chat_panel.add_message(
+                    ChatMessage(
+                        role=MessageRole.SYSTEM,
+                        content=f"Agent {agent.name} is {agent.status.name.lower()}: {agent.task if hasattr(agent, 'task') else agent.current_task}",
+                        timestamp=datetime.now(),
+                    )
+                )
 
     def on_command_entered(self, event: CommandEntered) -> None:
         """Handle command entry."""
@@ -176,6 +175,7 @@ class NexusTUI(App):
 
     def action_command_palette(self) -> None:
         """Show command palette."""
+
         def set_command(command: str | None):
             if command:
                 input_bar = self.query_one("#command-input", Input)
@@ -244,18 +244,20 @@ class NexusTUI(App):
 ╚══════════════════════════════════════════════════════════╝
         """
         chat_panel = self.query_one("#chat-panel", ChatPanel)
-        chat_panel.add_message(ChatMessage(
-            role=MessageRole.SYSTEM,
-            content=help_text.strip(),
-            timestamp=datetime.now(),
-        ))
+        chat_panel.add_message(
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=help_text.strip(),
+                timestamp=datetime.now(),
+            )
+        )
 
     def action_show_status(self) -> None:
         """Show status information."""
         state = self.state_manager.state
         status_text = f"""
-Session: {state.session_id or 'new'}
-Model: {state.active_model or 'not set'}
+Session: {state.session_id or "new"}
+Model: {state.active_model or "not set"}
 Messages: {len(state.messages)}
 Thinking Steps: {len(state.thinking_steps)}
 Tools: {len(state.tool_statuses)}
@@ -263,11 +265,13 @@ Agents: {len(state.active_agents)}
         """.strip()
 
         chat_panel = self.query_one("#chat-panel", ChatPanel)
-        chat_panel.add_message(ChatMessage(
-            role=MessageRole.SYSTEM,
-            content=status_text,
-            timestamp=datetime.now(),
-        ))
+        chat_panel.add_message(
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=status_text,
+                timestamp=datetime.now(),
+            )
+        )
 
     def action_quit(self) -> None:
         """Quit the application."""
@@ -282,6 +286,7 @@ Agents: {len(state.active_agents)}
 
         # Get project info
         import os
+
         status_bar.project = os.path.basename(os.getcwd())
         status_bar.battery = self._get_battery()
         status_bar.refresh()
@@ -311,77 +316,87 @@ Agents: {len(state.active_agents)}
             return True
 
         elif cmd == "history":
-            history_text = "Recent commands:\n" + "\n".join(
-                f"  {i+1}. {cmd}" for i, cmd in enumerate(self._command_history[-10:])
+            history_text = "Recent commands:\n" + "\n".join(f"  {i + 1}. {cmd}" for i, cmd in enumerate(self._command_history[-10:]))
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=history_text,
+                    timestamp=datetime.now(),
+                )
             )
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=history_text,
-                timestamp=datetime.now(),
-            ))
             return True
 
         elif cmd == "tools":
             from ..tools import get_registry
+
             registry = get_registry()
-            tools_text = "Available tools:\n" + "\n".join(
-                f"  - {t.name}: {t.description}" for t in registry.list_all()
+            tools_text = "Available tools:\n" + "\n".join(f"  - {t.name}: {t.description}" for t in registry.list_all())
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=tools_text,
+                    timestamp=datetime.now(),
+                )
             )
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=tools_text,
-                timestamp=datetime.now(),
-            ))
             return True
 
         elif cmd == "model":
             if args:
                 self.state_manager.set_active_model(args)
-                chat_panel.add_message(ChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=f"Model switched to: {args}",
-                    timestamp=datetime.now(),
-                ))
+                chat_panel.add_message(
+                    ChatMessage(
+                        role=MessageRole.SYSTEM,
+                        content=f"Model switched to: {args}",
+                        timestamp=datetime.now(),
+                    )
+                )
             else:
                 state = self.state_manager.state
-                chat_panel.add_message(ChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=f"Current model: {state.active_model or 'not set'}",
-                    timestamp=datetime.now(),
-                ))
+                chat_panel.add_message(
+                    ChatMessage(
+                        role=MessageRole.SYSTEM,
+                        content=f"Current model: {state.active_model or 'not set'}",
+                        timestamp=datetime.now(),
+                    )
+                )
             return True
 
         elif cmd == "facts":
             from ..memory import get_memory
+
             memory = get_memory()
             facts = memory.get_all_facts()
             if facts:
-                facts_text = "Stored facts:\n" + "\n".join(
-                    f"  - {k}: {v}" for k, v in facts.items()
-                )
+                facts_text = "Stored facts:\n" + "\n".join(f"  - {k}: {v}" for k, v in facts.items())
             else:
                 facts_text = "No facts stored."
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=facts_text,
-                timestamp=datetime.now(),
-            ))
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=facts_text,
+                    timestamp=datetime.now(),
+                )
+            )
             return True
 
         elif cmd == "session":
             from ..memory import get_memory
+
             memory = get_memory()
             session = memory.create_session()
             self.state_manager.set_session(session.id)
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=f"Session: {session.id}\nCreated: {session.created_at}",
-                timestamp=datetime.now(),
-            ))
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=f"Session: {session.id}\nCreated: {session.created_at}",
+                    timestamp=datetime.now(),
+                )
+            )
             return True
 
         elif cmd == "doctor":
             from ..doctor import NexusDoctor
+
             doctor = NexusDoctor()
             report = doctor.run_all()
 
@@ -391,35 +406,43 @@ Agents: {len(state.active_agents)}
                 doctor_text += f"{status} {category.upper()}\n"
                 if category == "cache" and result.get("found_count", 0) > 0:
                     from ..utils import format_bytes
-                    size = format_bytes(result['total_size_bytes'])
+
+                    size = format_bytes(result["total_size_bytes"])
                     doctor_text += f"    -> {result['found_count']} artifacts found ({size} potential savings)\n"
 
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=doctor_text.strip(),
-                timestamp=datetime.now(),
-            ))
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=doctor_text.strip(),
+                    timestamp=datetime.now(),
+                )
+            )
             return True
 
         elif cmd == "cleanup":
             from ..doctor import NexusDoctor
+
             doctor = NexusDoctor()
 
             # First show what will be cleaned
             report = doctor.tactical_cleanup(dry_run=True)
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=f"Cleaning {report['potential_savings']} of cache artifacts...",
-                timestamp=datetime.now(),
-            ))
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=f"Cleaning {report['potential_savings']} of cache artifacts...",
+                    timestamp=datetime.now(),
+                )
+            )
 
             # Execute actual cleanup
             result = doctor.tactical_cleanup(dry_run=False)
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=f"[bold green]Cleanup complete.[/] Freed {result['potential_savings']}.",
-                timestamp=datetime.now(),
-            ))
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=f"[bold green]Cleanup complete.[/] Freed {result['potential_savings']}.",
+                    timestamp=datetime.now(),
+                )
+            )
             self._update_status_bar()
             return True
 
@@ -436,11 +459,13 @@ Agents: {len(state.active_agents)}
         chat_panel = self.query_one("#chat-panel", ChatPanel)
 
         # Echo the user message immediately
-        chat_panel.add_message(ChatMessage(
-            role=MessageRole.USER,
-            content=user_input,
-            timestamp=datetime.now(),
-        ))
+        chat_panel.add_message(
+            ChatMessage(
+                role=MessageRole.USER,
+                content=user_input,
+                timestamp=datetime.now(),
+            )
+        )
 
         self.state_manager.set_busy(True)
 
@@ -501,21 +526,25 @@ Agents: {len(state.active_agents)}
                 return
 
             if turn.assistant_message:
-                chat_panel.add_message(ChatMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=turn.assistant_message,
-                    timestamp=datetime.now(),
-                ))
+                chat_panel.add_message(
+                    ChatMessage(
+                        role=MessageRole.ASSISTANT,
+                        content=turn.assistant_message,
+                        timestamp=datetime.now(),
+                    )
+                )
 
             if turn.error:
                 self.state_manager.set_error(turn.error)
 
         except Exception as e:
-            chat_panel.add_message(ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=f"Error: {e}",
-                timestamp=datetime.now(),
-            ))
+            chat_panel.add_message(
+                ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=f"Error: {e}",
+                    timestamp=datetime.now(),
+                )
+            )
             self.state_manager.set_error(str(e))
 
         finally:
@@ -527,7 +556,7 @@ Agents: {len(state.active_agents)}
         diff = result.get("metadata", {}).get("diff", "No diff available")
         path = result.get("metadata", {}).get("path", "Unknown")
 
-        diff_display = f"\n{'='*60}\nPROPOSED CHANGE: {path}\n{'='*60}\n{diff}"
+        diff_display = f"\n{'=' * 60}\nPROPOSED CHANGE: {path}\n{'=' * 60}\n{diff}"
 
         chat_panel = self.query_one("#chat-panel", ChatPanel)
 

@@ -24,6 +24,7 @@ from typing import Any
 @dataclass
 class FailureRecord:
     """A complete record of a failed operation."""
+
     failure_id: str
     timestamp: datetime
     tool_name: str
@@ -57,6 +58,7 @@ class FailureRecord:
 @dataclass
 class Lesson:
     """A synthesized lesson from failures."""
+
     lesson_id: str
     created_at: datetime
     title: str
@@ -99,10 +101,10 @@ class Lesson:
 ## Solution
 {self.solution}
 
-{f'## Code Snippet{chr(10)}```python{chr(10)}{self.code_snippet}{chr(10)}```' if self.code_snippet else ''}
+{f"## Code Snippet{chr(10)}```python{chr(10)}{self.code_snippet}{chr(10)}```" if self.code_snippet else ""}
 
 ## Examples
-{chr(10).join(f"{i+1}. {e}" for i, e in enumerate(self.examples))}
+{chr(10).join(f"{i + 1}. {e}" for i, e in enumerate(self.examples))}
 """
 
 
@@ -110,7 +112,7 @@ class LearningEngine:
     """
     The failure learning system. Records failures, synthesizes lessons,
     and applies them proactively.
-    
+
     Flow:
       failure → record → analyze → lesson → apply → reflect
     """
@@ -138,11 +140,7 @@ class LearningEngine:
         for f in failures:
             tool_usage[f.tool_name] = tool_usage.get(f.tool_name, 0) + 1
 
-        return {
-            "session_id": session_id,
-            "failures": [f.to_dict() for f in failures],
-            "tool_usage": tool_usage
-        }
+        return {"session_id": session_id, "failures": [f.to_dict() for f in failures], "tool_usage": tool_usage}
 
     def start_session(self, session_id: str) -> None:
         """Mark the start of a learning session."""
@@ -265,38 +263,29 @@ class LearningEngine:
     def _suggest_solution(self, failure: FailureRecord) -> str:
         """Suggest a solution for the failure type."""
         solutions = {
-            "NOT_FOUND": f"Check if the target exists before calling `{failure.tool_name}`. "
-                        "Verify file paths, URLs, and resource IDs.",
-            "PERMISSION_DENIED": f"Ensure proper permissions before calling `{failure.tool_name}`. "
-                                "Check if the user has the required access level.",
-            "NETWORK_TIMEOUT": f"Add retry logic with exponential backoff for `{failure.tool_name}`. "
-                              "Consider increasing timeout values.",
-            "SYNTAX_ERROR": f"Validate input format before calling `{failure.tool_name}`. "
-                           "Check the argument structure matches expected types.",
-            "RATE_LIMIT": f"Implement rate limiting for `{failure.tool_name}`. "
-                         "Add delays between calls and respect API quotas.",
-            "AUTH_ERROR": f"Verify authentication credentials for `{failure.tool_name}`. "
-                         "Check if API keys are valid and not expired.",
-            "IMPORT_ERROR": f"Ensure required modules are installed before using `{failure.tool_name}`. "
-                           "Try importing the module first to verify availability.",
-            "RESOURCE_ERROR": f"Reduce scope or batch size for `{failure.tool_name}`. "
-                             "Consider processing in smaller chunks.",
+            "NOT_FOUND": f"Check if the target exists before calling `{failure.tool_name}`. Verify file paths, URLs, and resource IDs.",
+            "PERMISSION_DENIED": f"Ensure proper permissions before calling `{failure.tool_name}`. Check if the user has the required access level.",
+            "NETWORK_TIMEOUT": f"Add retry logic with exponential backoff for `{failure.tool_name}`. Consider increasing timeout values.",
+            "SYNTAX_ERROR": f"Validate input format before calling `{failure.tool_name}`. Check the argument structure matches expected types.",
+            "RATE_LIMIT": f"Implement rate limiting for `{failure.tool_name}`. Add delays between calls and respect API quotas.",
+            "AUTH_ERROR": f"Verify authentication credentials for `{failure.tool_name}`. Check if API keys are valid and not expired.",
+            "IMPORT_ERROR": f"Ensure required modules are installed before using `{failure.tool_name}`. Try importing the module first to verify availability.",
+            "RESOURCE_ERROR": f"Reduce scope or batch size for `{failure.tool_name}`. Consider processing in smaller chunks.",
         }
-        return solutions.get(failure.error_type,
-            f"Review the error message and adjust the approach for `{failure.tool_name}`.")
+        return solutions.get(failure.error_type, f"Review the error message and adjust the approach for `{failure.tool_name}`.")
 
     def _suggest_code(self, failure: FailureRecord) -> str | None:
         """Suggest a code pattern to prevent this failure."""
         if failure.error_type == "NOT_FOUND":
-            return f'''async def safe_{failure.tool_name}(...):
+            return f"""async def safe_{failure.tool_name}(...):
     # Check if target exists first
     if not await check_exists(target):
         logger.warning(f"Target {{target}} not found")
         return None
-    return await {failure.tool_name}(...)'''
+    return await {failure.tool_name}(...)"""
 
         if failure.error_type == "NETWORK_TIMEOUT":
-            return f'''import asyncio
+            return f"""import asyncio
 
 async def resilient_{failure.tool_name}(...):
     for attempt in range(3):
@@ -306,14 +295,14 @@ async def resilient_{failure.tool_name}(...):
             if attempt == 2:
                 raise
             await asyncio.sleep(2 ** attempt)  # exponential backoff
-    return None'''
+    return None"""
 
         if failure.error_type == "RATE_LIMIT":
-            return f'''import asyncio
+            return f"""import asyncio
 
 async def rate_limited_{failure.tool_name}(...):
     async with rate_limiter:
-        return await {failure.tool_name}(...)'''
+        return await {failure.tool_name}(...)"""
 
         return None
 
@@ -327,8 +316,7 @@ async def rate_limited_{failure.tool_name}(...):
             # Check if any trigger condition matches
             for trigger in lesson.trigger_conditions:
                 trigger_lower = trigger.lower()
-                if trigger_lower in task_lower or \
-                   (tool_name and trigger_lower == f"tool:{tool_name}"):
+                if trigger_lower in task_lower or (tool_name and trigger_lower == f"tool:{tool_name}"):
                     applicable.append(lesson)
                     break
                 # Also check if error type keywords appear
@@ -452,10 +440,12 @@ async def rate_limited_{failure.tool_name}(...):
             for f in failures[-3:]:
                 lines.append(f"    ✗ {f.tool_name}: {f.error[:60]}...")
 
-        lines.extend([
-            "",
-            "  Run reflection loop? (yes/no/silent): ",
-        ])
+        lines.extend(
+            [
+                "",
+                "  Run reflection loop? (yes/no/silent): ",
+            ]
+        )
 
         return "\n".join(lines)
 

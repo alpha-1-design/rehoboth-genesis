@@ -30,11 +30,11 @@ logger = logging.getLogger(__name__)
 
 
 class SyncTarget(Enum):
-    LOCAL = auto()        # Local file system / USB
+    LOCAL = auto()  # Local file system / USB
     GITHUB_GIST = auto()  # GitHub Gist (cross-device via GitHub)
-    GIT_REMOTE = auto()   # Git repository (enterprise)
-    WEBRTC = auto()       # Real-time same-network sync
-    CLOUD = auto()        # Generic cloud (future: S3, GCS)
+    GIT_REMOTE = auto()  # Git repository (enterprise)
+    WEBRTC = auto()  # Real-time same-network sync
+    CLOUD = auto()  # Generic cloud (future: S3, GCS)
 
 
 class SyncStatus(Enum):
@@ -49,6 +49,7 @@ class SyncStatus(Enum):
 @dataclass
 class SyncEndpoint:
     """A sync destination."""
+
     name: str
     target: SyncTarget
     url: str | None = None
@@ -76,6 +77,7 @@ class SyncEndpoint:
 @dataclass
 class SyncItem:
     """An item to be synced."""
+
     path: Path
     hash: str = ""
     size: int = 0
@@ -87,7 +89,7 @@ class SyncItem:
 class SyncEngine:
     """
     Manages sync across devices and external services.
-    
+
     Default sync strategy:
       - Sessions synced to GitHub Gist (with GitHub token)
       - Config synced locally (~/.nexus/sync/)
@@ -155,6 +157,7 @@ class SyncEngine:
             return False
         try:
             import httpx
+
             resp = httpx.get(
                 "https://api.github.com/gists",
                 headers={"Authorization": f"token {endpoint.token}", "Accept": "application/vnd.github+json"},
@@ -186,10 +189,12 @@ class SyncEngine:
         """Test git remote connectivity."""
         if endpoint.path:
             import subprocess
+
             try:
                 result = subprocess.run(
                     ["git", "ls-remote", str(endpoint.path)],
-                    capture_output=True, timeout=10,
+                    capture_output=True,
+                    timeout=10,
                 )
                 endpoint.status = SyncStatus.SYNCED if result.returncode == 0 else SyncStatus.ERROR
                 return result.returncode == 0
@@ -360,7 +365,7 @@ class SyncEngine:
                     "success": True,
                     "items": pulled,
                     "conflicts": conflicts,
-                    "message": f"Pulled {pulled} items" + (f", {len(conflicts)} conflicts" if conflicts else "")
+                    "message": f"Pulled {pulled} items" + (f", {len(conflicts)} conflicts" if conflicts else ""),
                 }
             else:
                 return {"success": False, "error": f"GitHub API error: {resp.status_code}"}
@@ -430,11 +435,9 @@ class SyncEngine:
             # Init or clone
             if not work_dir.exists():
                 if (repo_path / ".git").exists():
-                    subprocess.run(["git", "clone", str(repo_path), str(work_dir)],
-                                  capture_output=True, check=True)
+                    subprocess.run(["git", "clone", str(repo_path), str(work_dir)], capture_output=True, check=True)
             else:
-                subprocess.run(["git", "-C", str(work_dir), "pull"],
-                              capture_output=True, check=True)
+                subprocess.run(["git", "-C", str(work_dir), "pull"], capture_output=True, check=True)
 
             # Copy sessions
             sessions_path = Path.home() / ".nexus" / "memory" / "sessions"
@@ -446,8 +449,7 @@ class SyncEngine:
 
             # Commit and push
             subprocess.run(["git", "-C", str(work_dir), "add", "."], check=True)
-            subprocess.run(["git", "-C", str(work_dir), "commit", "-m",
-                          f"Nexus sync {datetime.now().isoformat()}"], check=True)
+            subprocess.run(["git", "-C", str(work_dir), "commit", "-m", f"Nexus sync {datetime.now().isoformat()}"], check=True)
             subprocess.run(["git", "-C", str(work_dir), "push"], check=True)
 
             endpoint.last_sync = datetime.now()
@@ -591,6 +593,7 @@ class GitHubConnector(ExternalServiceConnector):
 
     async def test_connection(self) -> bool:
         import httpx
+
         try:
             resp = httpx.get(
                 f"https://api.github.com/repos/{self.owner}/{self.repo}",
@@ -605,6 +608,7 @@ class GitHubConnector(ExternalServiceConnector):
 
     async def push_session(self, session_data: dict) -> dict:
         import httpx
+
         try:
             resp = httpx.post(
                 f"https://api.github.com/repos/{self.owner}/{self.repo}/dispatches",
@@ -618,6 +622,7 @@ class GitHubConnector(ExternalServiceConnector):
 
     async def notify(self, message: str, context: dict | None = None) -> None:
         import httpx
+
         try:
             body = {"body": f"[Nexus] {message}"}
             if context:
@@ -641,6 +646,7 @@ class SlackConnector(ExternalServiceConnector):
 
     async def test_connection(self) -> bool:
         import httpx
+
         try:
             resp = httpx.post(self.webhook_url, json={"text": "Nexus connected ✓"}, timeout=10)
             self.connected = resp.status_code == 200
@@ -651,6 +657,7 @@ class SlackConnector(ExternalServiceConnector):
 
     async def notify(self, message: str, context: dict | None = None) -> None:
         import httpx
+
         blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f"*[Nexus]*\n{message}"}}]
         if context:
             blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"```json\n{json.dumps(context, indent=2)[:500]}\n```"}})
@@ -670,6 +677,7 @@ class VercelConnector(ExternalServiceConnector):
 
     async def test_connection(self) -> bool:
         import httpx
+
         headers = {"Authorization": f"Bearer {self.token}"}
         try:
             resp = httpx.get("https://api.vercel.com/v2/deployments", headers=headers, timeout=10)
@@ -681,6 +689,7 @@ class VercelConnector(ExternalServiceConnector):
 
     async def deploy(self, project_path: str, options: dict | None = None) -> dict:
         import httpx
+
         headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
         payload = {"name": options.get("name", "nexus-deploy") if options else "nexus-deploy"}
         try:

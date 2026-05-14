@@ -23,6 +23,7 @@ from typing import Any
 @dataclass
 class DisplayProfile:
     """Display settings for a terminal profile."""
+
     name: str
     width: int
     use_unicode: bool
@@ -264,7 +265,7 @@ PHONE_COMMANDS = {
     "/a": "/abort",
     "/g": "/context",  # get context
     "/t": "/tools",
-    "/w": "/save",     # write/save
+    "/w": "/save",  # write/save
     "/r": "/retry",
     "/f": "/facts",
     "/sk": "/skills",
@@ -278,7 +279,7 @@ PHONE_COMMANDS = {
 class PhoneMode:
     """
     Phone mode integration. Wraps the REPL with phone-optimized rendering.
-    
+
     To enable: set NEXUS_PHONE_MODE=1 or NEXUS_SSH_MODE=1
     Or just run on a small terminal — it auto-detects.
     """
@@ -287,10 +288,7 @@ class PhoneMode:
         self.profile = detect_display_profile()
         self.formatter = PhoneModeFormatter(self.profile)
         self._enabled = (
-            os.environ.get("NEXUS_PHONE_MODE") or
-            os.environ.get("NEXUS_SSH_MODE") or
-            os.environ.get("TERMUX") or
-            self.profile.name in ("phone", "ssh_slow")
+            os.environ.get("NEXUS_PHONE_MODE") or os.environ.get("NEXUS_SSH_MODE") or os.environ.get("TERMUX") or self.profile.name in ("phone", "ssh_slow")
         )
 
     @property
@@ -350,7 +348,7 @@ class PhoneMode:
         # Check short commands
         for short, full in PHONE_COMMANDS.items():
             if line.startswith(short):
-                remainder = line[len(short):]
+                remainder = line[len(short) :]
                 return full + remainder
 
         return line

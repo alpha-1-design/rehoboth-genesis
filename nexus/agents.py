@@ -295,11 +295,7 @@ Use @planner or @coder to share relevant findings.""",
         self.agents[agent_id] = agent
 
         role_prompt = self.ROLE_PROMPTS.get(role, "")
-        final_prompt = (
-            f"{role_prompt}\n\nSpecialization: {specialized_prompt}"
-            if specialized_prompt
-            else role_prompt
-        )
+        final_prompt = f"{role_prompt}\n\nSpecialization: {specialized_prompt}" if specialized_prompt else role_prompt
 
         self._broadcast_system(f"[spawn] {agent_name} started")
 
@@ -308,9 +304,7 @@ Use @planner or @coder to share relevant findings.""",
 
         return agent
 
-    async def _agent_task(
-        self, agent: Agent, task: str, system_prompt_override: str | None = None
-    ) -> None:
+    async def _agent_task(self, agent: Agent, task: str, system_prompt_override: str | None = None) -> None:
         """Run a task for an agent."""
         from nexus.providers import Message, get_manager
 
@@ -354,9 +348,7 @@ Use @planner or @coder to share relevant findings.""",
         context += "- Report completion or issues clearly\n"
         return context
 
-    def _broadcast(
-        self, agent_id: str, agent_name: str, content: str, msg_type: str = "message"
-    ) -> None:
+    def _broadcast(self, agent_id: str, agent_name: str, content: str, msg_type: str = "message") -> None:
         """Broadcast a message to the team."""
         msg = TeamMessage(
             msg_id=_next_msg_id(),
@@ -459,23 +451,29 @@ Use @planner or @coder to share relevant findings.""",
 
         # Skip conversational messages (greetings, meta-questions)
         conversational = [
-            "hi", "hello", "hey", "greetings", "good morning", "good afternoon",
-            "who are you", "what are you", "what is your name", "what's your name",
-            "how are you", "thanks", "thank you", "bye", "goodbye",
+            "hi",
+            "hello",
+            "hey",
+            "greetings",
+            "good morning",
+            "good afternoon",
+            "who are you",
+            "what are you",
+            "what is your name",
+            "what's your name",
+            "how are you",
+            "thanks",
+            "thank you",
+            "bye",
+            "goodbye",
         ]
         if any(p in task_lower for p in conversational) and len(task.split()) <= 8:
             return []
 
-        if any(
-            w in task_lower
-            for w in ["build", "create", "write", "add", "implement", "fix", "update"]
-        ):
+        if any(w in task_lower for w in ["build", "create", "write", "add", "implement", "fix", "update"]):
             spawned.append(self.spawn(AgentRole.CODER, task=task))
 
-        if any(
-            w in task_lower
-            for w in ["complex", "multiple", "entire", "architecture", "system", "migrate"]
-        ):
+        if any(w in task_lower for w in ["complex", "multiple", "entire", "architecture", "system", "migrate"]):
             spawned.append(self.spawn(AgentRole.PLANNER, task=task))
 
         if any(w in task_lower for w in ["review", "check", "audit", "security"]):
@@ -502,5 +500,3 @@ def init_team(lead_name: str = "nexus", pm=None) -> MultiAgentTeam:
     global _team
     _team = MultiAgentTeam(lead_name=lead_name, provider_manager=pm)
     return _team
-
-
