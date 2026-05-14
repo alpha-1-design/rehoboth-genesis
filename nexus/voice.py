@@ -113,6 +113,7 @@ class FreeTTSProvider(TTSProvider):
                     audio_resp.raise_for_status()
                     return audio_resp.content
                 except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
                     if attempt < max_retries - 1:
                         await asyncio.sleep(1 * (attempt + 1))
                         continue
@@ -149,6 +150,7 @@ class FreeTTSProvider(TTSProvider):
             finally:
                 pa.terminate()
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             print(f"[TTS] Audio playback skipped (error): {e}")
 
     def _convert_to_wav(self, audio: bytes) -> bytes:
@@ -193,6 +195,7 @@ class OpenAITTSProvider(TTSProvider):
             stream.close()
             pa.terminate()
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             print(f"[TTS] Audio playback skipped: {e}")
 
     def _mp3_to_wav(self, mp3_data: bytes) -> bytes:
@@ -237,6 +240,7 @@ class SystemTTSProvider(TTSProvider):
             os.unlink(wav_path)
             return data
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             raise RuntimeError(f"No system TTS available: {e}")
 
     async def stream_speak(self, text: str, config: VoiceConfig) -> AsyncIterator[bytes]:
@@ -254,6 +258,7 @@ class SystemTTSProvider(TTSProvider):
             stream.close()
             pa.terminate()
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             print(f"[TTS] Audio playback skipped: {e}")
 
 
@@ -291,6 +296,7 @@ class STTProvider(ABC):
                 frames_per_buffer=1024,
             )
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             p.terminate()
             raise NexusError(f"Failed to open microphone: {e}")
 
@@ -353,6 +359,7 @@ class STTProvider(ABC):
                 frames_per_buffer=512,
             )
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             p.terminate()
             raise NexusError(f"Failed to open microphone: {e}")
 
@@ -583,6 +590,7 @@ class VoiceEngine:
             audio = await self.tts.speak(text, self.config)
             await self.tts.play_audio(audio, self.config)
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             print(f"\n[Nexus] Speech Error: {format_error(e)}")
 
     async def transcribe_audio(self, audio: bytes) -> str:
@@ -599,6 +607,7 @@ class VoiceEngine:
                 text = await self.transcribe_audio(audio)
                 return text.strip() if text else None
         except Exception as e:
+                raise NexusError(f"Operation failed: {e}") from e
             print(f"\n[Nexus] Listen Error: {format_error(e)}")
         return None
 
